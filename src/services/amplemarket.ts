@@ -23,13 +23,6 @@ export interface AmplemarketSequence {
   enrolledCount: number;
 }
 
-export interface AmplemarketUser {
-  id: string;
-  email: string;
-  name: string;
-  organization: string;
-}
-
 async function fetchAmplemarket(path: string, options: RequestInit = {}) {
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -80,6 +73,28 @@ export async function getPeopleByDomain(domain: string): Promise<AmplemarketPers
   }
 }
 
+// Hiring In Relevant Department
+export async function getHiringSignals(domain: string): Promise<Partial<Signal>[]> {
+  if (!API_KEY) return getMockHiringSignals(domain);
+  try {
+    const data = await fetchAmplemarket(`/signals/hiring?domain=${encodeURIComponent(domain)}`);
+    return data?.signals ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// Post from market leaders / Post mentioned specific keywords
+export async function getSocialSignals(domain: string): Promise<Partial<Signal>[]> {
+  if (!API_KEY) return getMockSocialSignals(domain);
+  try {
+    const data = await fetchAmplemarket(`/signals/social?domain=${encodeURIComponent(domain)}`);
+    return data?.signals ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getSequences(): Promise<AmplemarketSequence[]> {
   if (!API_KEY) return getMockSequences();
   try {
@@ -106,25 +121,13 @@ export async function enrollInSequence(personId: string, sequenceId: string): Pr
   }
 }
 
-export async function getAdSpendSignals(domain: string): Promise<Partial<Signal>[]> {
-  if (!API_KEY) return getMockAdSignals(domain);
-  try {
-    const data = await fetchAmplemarket(`/signals/ad-spend?domain=${encodeURIComponent(domain)}`);
-    return data?.signals ?? [];
-  } catch {
-    return [];
-  }
-}
-
 // ── Mock fallbacks ────────────────────────────────────────────────────────────
 
 function getMockPerson(email: string): AmplemarketPerson {
   return {
     id: `mock-${email}`,
-    firstName: 'John',
-    lastName: 'Doe',
-    title: 'Head of Growth',
-    email,
+    firstName: 'John', lastName: 'Doe',
+    title: 'Head of Growth', email,
     company: 'Unknown',
     linkedinUrl: 'https://linkedin.com/in/johndoe',
     location: 'San Francisco, CA',
@@ -139,28 +142,36 @@ function getMockSequences(): AmplemarketSequence[] {
   ];
 }
 
-function getMockAdSignals(domain: string): Partial<Signal>[] {
+function getMockHiringSignals(domain: string): Partial<Signal>[] {
   const map: Record<string, Partial<Signal>[]> = {
     'uber.com': [
-      {
-        type: 'Using ASA',
-        category: 'Ad Spend',
-        source: 'Amplemarket',
-        title: 'Active Apple Search Ads Campaigns',
-        description: 'Running 200+ active ASA campaigns across 15 markets',
-        confidence: 'High',
-        impact: 'High',
-      },
-      {
-        type: 'Using Meta/TT',
-        category: 'Ad Spend',
-        source: 'Amplemarket',
-        title: 'Heavy Meta & TikTok Spend Detected',
-        description: 'Large-scale paid social campaigns on Meta and TikTok',
-        confidence: 'Medium',
-        impact: 'High',
-      },
+      { type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Amplemarket', title: 'Hiring 18 mobile engineers', description: 'Active roles across iOS, Android, and platform infrastructure on the careers site.', confidence: 'High', impact: 'High' },
+    ],
+    'revolut.com': [
+      { type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Amplemarket', title: 'Hiring 12 growth & UA specialists', description: 'Multiple open roles for user acquisition and growth marketing across European markets.', confidence: 'High', impact: 'High' },
+    ],
+    'bolt.eu': [
+      { type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Amplemarket', title: 'Hiring mobile marketing manager', description: 'Open role for mobile marketing manager to own app growth strategy.', confidence: 'Medium', impact: 'Medium' },
+    ],
+    'klarna.com': [
+      { type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Amplemarket', title: 'Hiring performance marketing lead', description: 'Klarna seeking senior performance marketer to own paid UA across iOS and Android.', confidence: 'High', impact: 'Medium' },
     ],
   };
-  return map[domain] ?? [];
+  return map[domain] || [];
+}
+
+function getMockSocialSignals(domain: string): Partial<Signal>[] {
+  const map: Record<string, Partial<Signal>[]> = {
+    'uber.com': [
+      { type: 'Post from market leaders', category: 'Social', source: 'Amplemarket', title: 'Uber VP posted on mobile growth', description: 'Sarah Johnson (VP Engineering) shared post on scaling mobile infrastructure for LATAM expansion.', confidence: 'Medium', impact: 'Medium' },
+      { type: 'Post mentioned specific keywords', category: 'Social', source: 'Amplemarket', title: 'Post mentioned "attribution" and "MMP"', description: 'Uber growth team LinkedIn post discussed attribution challenges at scale — high buying intent keywords.', confidence: 'High', impact: 'High' },
+    ],
+    'revolut.com': [
+      { type: 'Post mentioned specific keywords', category: 'Social', source: 'Amplemarket', title: 'Post mentioned "mobile attribution stack"', description: 'Revolut Head of Growth posted about evaluating their mobile attribution stack for accuracy.', confidence: 'High', impact: 'High' },
+    ],
+    'wise.com': [
+      { type: 'Post from market leaders', category: 'Social', source: 'Amplemarket', title: 'Wise CMO posted on fintech user acquisition', description: 'CMO shared insights on CAC optimization challenges in mature fintech markets.', confidence: 'Medium', impact: 'Low' },
+    ],
+  };
+  return map[domain] || [];
 }

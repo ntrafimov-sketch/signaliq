@@ -30,18 +30,8 @@ export interface HubSpotCompany {
   };
 }
 
-export interface HubSpotWebVisit {
-  contactId: string;
-  contactEmail: string;
-  pageUrl: string;
-  visitDate: string;
-  sessionDuration: number;
-}
-
 async function fetchHubSpot(path: string, options: RequestInit = {}) {
-  if (!API_KEY) {
-    throw new Error('HubSpot API key not configured');
-  }
+  if (!API_KEY) throw new Error('HubSpot API key not configured');
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -50,27 +40,17 @@ async function fetchHubSpot(path: string, options: RequestInit = {}) {
       ...options.headers,
     },
   });
-  if (!response.ok) {
-    throw new Error(`HubSpot API error: ${response.status}`);
-  }
+  if (!response.ok) throw new Error(`HubSpot API error: ${response.status}`);
   return response.json();
 }
 
 export async function getContactsByDomain(domain: string): Promise<HubSpotContact[]> {
-  if (!API_KEY) {
-    return [];
-  }
+  if (!API_KEY) return [];
   try {
     const data = await fetchHubSpot(`/crm/v3/objects/contacts/search`, {
       method: 'POST',
       body: JSON.stringify({
-        filterGroups: [{
-          filters: [{
-            propertyName: 'email',
-            operator: 'CONTAINS_TOKEN',
-            value: `*@${domain}`,
-          }],
-        }],
+        filterGroups: [{ filters: [{ propertyName: 'email', operator: 'CONTAINS_TOKEN', value: `*@${domain}` }] }],
       }),
     });
     return data.results || [];
@@ -80,20 +60,12 @@ export async function getContactsByDomain(domain: string): Promise<HubSpotContac
 }
 
 export async function getCompanyByDomain(domain: string): Promise<HubSpotCompany | null> {
-  if (!API_KEY) {
-    return null;
-  }
+  if (!API_KEY) return null;
   try {
     const data = await fetchHubSpot(`/crm/v3/objects/companies/search`, {
       method: 'POST',
       body: JSON.stringify({
-        filterGroups: [{
-          filters: [{
-            propertyName: 'domain',
-            operator: 'EQ',
-            value: domain,
-          }],
-        }],
+        filterGroups: [{ filters: [{ propertyName: 'domain', operator: 'EQ', value: domain }] }],
       }),
     });
     return data.results?.[0] || null;
@@ -102,71 +74,9 @@ export async function getCompanyByDomain(domain: string): Promise<HubSpotCompany
   }
 }
 
-export async function getWebsiteVisitSignals(domain: string): Promise<Partial<Signal>[]> {
-  if (!API_KEY) {
-    const mockSignals: Record<string, Partial<Signal>[]> = {
-      'uber.com': [
-        {
-          type: 'Was on our website',
-          category: 'Website',
-          source: 'HubSpot',
-          title: 'Multiple Uber Employees Visited Pricing Page',
-          description: '4 employees from uber.com visited the pricing and integrations page in the last 7 days',
-          confidence: 'High',
-          impact: 'High',
-        },
-      ],
-      'revolut.com': [
-        {
-          type: 'Was on our website',
-          category: 'Website',
-          source: 'HubSpot',
-          title: 'Website Visits from Revolut Team',
-          description: '3 Revolut employees visited our platform pages this week',
-          confidence: 'High',
-          impact: 'Medium',
-        },
-      ],
-    };
-    return mockSignals[domain] || [];
-  }
-  try {
-    // In real implementation, would query HubSpot analytics API
-    // using PORTAL_ID for tracking data
-    void PORTAL_ID; // used for tracking in production
-    const data = await fetchHubSpot(`/analytics/v2/reports/website-traffic?domain=${domain}`);
-    return data.signals || [];
-  } catch {
-    return [];
-  }
-}
-
+// Content Download
 export async function getContentDownloadSignals(domain: string): Promise<Partial<Signal>[]> {
-  if (!API_KEY) {
-    const mockSignals: Record<string, Partial<Signal>[]> = {
-      'uber.com': [
-        {
-          type: 'Content Download',
-          category: 'Content',
-          source: 'HubSpot',
-          title: 'Downloaded Mobile Attribution Guide',
-          description: 'An Uber employee downloaded our comprehensive guide on mobile attribution best practices',
-          confidence: 'High',
-          impact: 'Medium',
-        },
-        {
-          type: 'Webinar Visited',
-          category: 'Content',
-          source: 'HubSpot',
-          title: 'Attended UA Optimization Webinar',
-          description: '2 Uber employees attended our webinar on user acquisition optimization strategies',
-          confidence: 'High',
-          impact: 'Low',
-        },
-      ],
-    };
-    return mockSignals[domain] || [];
-  }
+  if (!API_KEY) return getMockContentDownloadSignals(domain);
   try {
     const data = await fetchHubSpot(`/marketing/v3/forms/submissions?domain=${domain}`);
     return data.signals || [];
@@ -175,12 +85,19 @@ export async function getContentDownloadSignals(domain: string): Promise<Partial
   }
 }
 
-export async function syncAccountToCRM(accountData: {
-  name: string;
-  domain: string;
-  industry: string;
-  employees: number;
-}): Promise<string | null> {
+// Webinar Visited
+export async function getWebinarSignals(domain: string): Promise<Partial<Signal>[]> {
+  if (!API_KEY) return getMockWebinarSignals(domain);
+  try {
+    void PORTAL_ID;
+    const data = await fetchHubSpot(`/marketing/v3/events?contactDomain=${domain}&type=webinar`);
+    return data.signals || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function syncAccountToCRM(accountData: { name: string; domain: string; industry: string; employees: number }): Promise<string | null> {
   if (!API_KEY) {
     console.log('Mock: Syncing account to HubSpot CRM', accountData);
     return `mock-hubspot-id-${Date.now()}`;
@@ -188,14 +105,7 @@ export async function syncAccountToCRM(accountData: {
   try {
     const data = await fetchHubSpot('/crm/v3/objects/companies', {
       method: 'POST',
-      body: JSON.stringify({
-        properties: {
-          name: accountData.name,
-          domain: accountData.domain,
-          industry: accountData.industry,
-          numberofemployees: accountData.employees.toString(),
-        },
-      }),
+      body: JSON.stringify({ properties: { name: accountData.name, domain: accountData.domain, industry: accountData.industry, numberofemployees: accountData.employees.toString() } }),
     });
     return data.id;
   } catch {
@@ -211,4 +121,33 @@ export async function testConnection(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ── Mock fallbacks ────────────────────────────────────────────────────────────
+
+function getMockContentDownloadSignals(domain: string): Partial<Signal>[] {
+  const map: Record<string, Partial<Signal>[]> = {
+    'uber.com': [
+      { type: 'Content Download', category: 'Content', source: 'HubSpot', title: 'Downloaded mobile attribution guide', description: 'An Uber employee downloaded our comprehensive guide on mobile attribution best practices.', confidence: 'High', impact: 'Medium' },
+    ],
+    'revolut.com': [
+      { type: 'Content Download', category: 'Content', source: 'HubSpot', title: 'Downloaded fintech UA playbook', description: 'Revolut growth team member downloaded our user acquisition playbook for fintech apps.', confidence: 'High', impact: 'Medium' },
+    ],
+    'klarna.com': [
+      { type: 'Content Download', category: 'Content', source: 'HubSpot', title: 'Downloaded BNPL attribution guide', description: 'Klarna team downloaded our guide on measuring paid UA for BNPL products.', confidence: 'Medium', impact: 'Medium' },
+    ],
+  };
+  return map[domain] || [];
+}
+
+function getMockWebinarSignals(domain: string): Partial<Signal>[] {
+  const map: Record<string, Partial<Signal>[]> = {
+    'uber.com': [
+      { type: 'Webinar Visited', category: 'Content', source: 'HubSpot', title: 'Attended UA optimization webinar', description: '2 Uber employees attended our webinar on user acquisition optimization strategies across iOS and Android.', confidence: 'High', impact: 'Low' },
+    ],
+    'revolut.com': [
+      { type: 'Webinar Visited', category: 'Content', source: 'HubSpot', title: 'Attended mobile measurement summit', description: 'Revolut product manager attended our mobile measurement best practices virtual summit.', confidence: 'Medium', impact: 'Low' },
+    ],
+  };
+  return map[domain] || [];
 }

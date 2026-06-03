@@ -23,9 +23,7 @@ export interface DemandbaseIntentData {
 }
 
 async function fetchDemandbase(path: string, options: RequestInit = {}) {
-  if (!API_KEY) {
-    throw new Error('Demandbase API key not configured');
-  }
+  if (!API_KEY) throw new Error('Demandbase API key not configured');
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -34,38 +32,12 @@ async function fetchDemandbase(path: string, options: RequestInit = {}) {
       ...options.headers,
     },
   });
-  if (!response.ok) {
-    throw new Error(`Demandbase API error: ${response.status}`);
-  }
+  if (!response.ok) throw new Error(`Demandbase API error: ${response.status}`);
   return response.json();
 }
 
 export async function getAccountIntelligence(domain: string): Promise<DemandbaseAccount | null> {
-  if (!API_KEY) {
-    const mockData: Record<string, DemandbaseAccount> = {
-      'uber.com': {
-        id: 'db-uber',
-        domain: 'uber.com',
-        company_name: 'Uber',
-        industry: 'Transportation',
-        employee_count: 32800,
-        revenue: 37200000000,
-        intent_score: 92,
-        topics: ['mobile attribution', 'MMP', 'user acquisition', 'app marketing'],
-      },
-      'revolut.com': {
-        id: 'db-revolut',
-        domain: 'revolut.com',
-        company_name: 'Revolut',
-        industry: 'Financial Services',
-        employee_count: 9800,
-        revenue: 2200000000,
-        intent_score: 88,
-        topics: ['mobile attribution', 'fintech marketing', 'growth hacking'],
-      },
-    };
-    return mockData[domain] || null;
-  }
+  if (!API_KEY) return getMockAccountIntel(domain);
   try {
     return await fetchDemandbase(`/accounts?domain=${encodeURIComponent(domain)}`);
   } catch {
@@ -90,34 +62,22 @@ export async function getIntentData(domain: string): Promise<DemandbaseIntentDat
   }
 }
 
-export async function getCompetitiveSignals(domain: string): Promise<Partial<Signal>[]> {
-  if (!API_KEY) {
-    const mockSignals: Record<string, Partial<Signal>[]> = {
-      'uber.com': [
-        {
-          type: 'Using Competitors',
-          category: 'Competitive',
-          source: 'Demandbase',
-          title: 'Using Adjust for Attribution',
-          description: 'Uber uses Adjust as primary MMP — competitive displacement opportunity',
-          confidence: 'High',
-          impact: 'Medium',
-        },
-        {
-          type: 'Competitor Research',
-          category: 'Competitive',
-          source: 'Demandbase',
-          title: 'Researching MMP Alternatives',
-          description: 'High intent signals for MMP evaluation from Uber employees',
-          confidence: 'Medium',
-          impact: 'High',
-        },
-      ],
-    };
-    return mockSignals[domain] || [];
-  }
+// Was on our website (web analytics / IP identification)
+export async function getWebsiteVisitSignals(domain: string): Promise<Partial<Signal>[]> {
+  if (!API_KEY) return getMockWebsiteSignals(domain);
   try {
-    const data = await fetchDemandbase(`/signals/competitive?domain=${encodeURIComponent(domain)}`);
+    const data = await fetchDemandbase(`/signals/website?domain=${encodeURIComponent(domain)}`);
+    return data.signals || [];
+  } catch {
+    return [];
+  }
+}
+
+// Competitor Research (intent data)
+export async function getCompetitorResearchSignals(domain: string): Promise<Partial<Signal>[]> {
+  if (!API_KEY) return getMockCompetitorResearchSignals(domain);
+  try {
+    const data = await fetchDemandbase(`/signals/intent?domain=${encodeURIComponent(domain)}`);
     return data.signals || [];
   } catch {
     return [];
@@ -132,4 +92,44 @@ export async function testConnection(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ── Mock fallbacks ────────────────────────────────────────────────────────────
+
+function getMockAccountIntel(domain: string): DemandbaseAccount | null {
+  const map: Record<string, DemandbaseAccount> = {
+    'uber.com': { id: 'db-uber', domain: 'uber.com', company_name: 'Uber', industry: 'Transportation', employee_count: 32800, revenue: 37200000000, intent_score: 92, topics: ['mobile attribution', 'MMP', 'user acquisition', 'app marketing'] },
+    'revolut.com': { id: 'db-revolut', domain: 'revolut.com', company_name: 'Revolut', industry: 'Financial Services', employee_count: 9800, revenue: 2200000000, intent_score: 88, topics: ['mobile attribution', 'fintech marketing', 'growth hacking'] },
+  };
+  return map[domain] || null;
+}
+
+function getMockWebsiteSignals(domain: string): Partial<Signal>[] {
+  const map: Record<string, Partial<Signal>[]> = {
+    'uber.com': [
+      { type: 'Was on our website', category: 'Website', source: 'Demandbase', title: '3 visits to pricing page from Uber IPs', description: 'Anonymous sessions from Uber corporate IP ranges viewed pricing and the mobile attribution case study.', confidence: 'High', impact: 'High' },
+    ],
+    'revolut.com': [
+      { type: 'Was on our website', category: 'Website', source: 'Demandbase', title: 'Revolut team visited integration docs', description: '2 sessions from Revolut IP ranges spent 8+ minutes on SDK integration documentation.', confidence: 'High', impact: 'Medium' },
+    ],
+    'bolt.eu': [
+      { type: 'Was on our website', category: 'Website', source: 'Demandbase', title: 'Bolt visited pricing & comparison pages', description: 'IP identified as Bolt HQ visited pricing page and competitor comparison guide.', confidence: 'Medium', impact: 'High' },
+    ],
+  };
+  return map[domain] || [];
+}
+
+function getMockCompetitorResearchSignals(domain: string): Partial<Signal>[] {
+  const map: Record<string, Partial<Signal>[]> = {
+    'uber.com': [
+      { type: 'Competitor Research', category: 'Competitive', source: 'Demandbase', title: 'High intent on MMP evaluation topics', description: 'Uber employees showing strong intent signals around MMP comparison and mobile attribution evaluation pages.', confidence: 'High', impact: 'High' },
+    ],
+    'revolut.com': [
+      { type: 'Competitor Research', category: 'Competitive', source: 'Demandbase', title: 'Researching attribution alternatives', description: 'Revolut team consuming content around mobile attribution platforms and switching guides.', confidence: 'Medium', impact: 'High' },
+    ],
+    'klarna.com': [
+      { type: 'Competitor Research', category: 'Competitive', source: 'Demandbase', title: 'Intent spike on MMP comparison content', description: 'Klarna showing 3x intent increase on mobile measurement and attribution vendor comparison topics.', confidence: 'Medium', impact: 'Medium' },
+    ],
+  };
+  return map[domain] || [];
 }
