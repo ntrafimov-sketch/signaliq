@@ -8,13 +8,12 @@ import { useStore } from '../store/useStore';
 import { enrichAccounts } from '../services/signals';
 import { mockSignals, mockDepartmentIntel } from '../data/mockData';
 
-const REQUIRED_FIELDS = ['company_name', 'domain', 'industry', 'country'];
+const REQUIRED_FIELDS = ['account_name', 'linkedin', 'account_domain'];
 
 interface CsvRow {
-  company_name: string;
-  domain: string;
-  industry: string;
-  country: string;
+  account_name: string;
+  linkedin: string;
+  account_domain: string;
   employees?: string;
   [key: string]: string | undefined;
 }
@@ -50,8 +49,8 @@ export function CsvUpload() {
 
         const newAccounts: Account[] = results.data.map((row, idx) => ({
           id: `uploaded-${Date.now()}-${idx}`,
-          company_name: row.company_name || '',
-          domain: row.domain || '',
+          company_name: row.account_name || '',
+          domain: row.account_domain || '',
           industry: row.industry || '',
           country: row.country || '',
           employees: parseInt(row.employees || '0', 10) || 0,
@@ -59,9 +58,9 @@ export function CsvUpload() {
           scoreLabel: 'Cold' as const,
           signals: [],
           lastUpdated: 'Just now',
-          description: `${row.company_name} is a ${row.industry} company based in ${row.country}.`,
+          description: `${row.account_name} — ${row.account_domain}`,
           founded: 'N/A',
-          hq: row.country,
+          hq: row.country || 'N/A',
           revenue: 'N/A',
           status: 'Private',
           logoColor: '#6366F1',
@@ -78,7 +77,7 @@ export function CsvUpload() {
 
         try {
           const result = await enrichAccounts(
-            newAccounts.map(a => ({ id: a.id, domain: a.domain, company_name: a.company_name }))
+            newAccounts.map(a => ({ id: a.id, domain: a.domain, company_name: a.company_name, industry: a.industry }))
           );
 
           // Update accounts with enriched signals and scores
@@ -126,7 +125,7 @@ export function CsvUpload() {
   }, [processFile]);
 
   const downloadTemplate = () => {
-    const csv = 'company_name,domain,industry,country,employees\nAcme Corp,acmecorp.com,SaaS,United States,500\nBeta Inc,betainc.io,Fintech,United Kingdom,200\n';
+    const csv = 'account_name,linkedin,account_domain,industry,country,employees\nAcme Corp,https://linkedin.com/company/acme-corp,acmecorp.com,SaaS,United States,500\nBeta Inc,https://linkedin.com/company/beta-inc,betainc.io,Fintech,United Kingdom,200\n';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -153,7 +152,7 @@ export function CsvUpload() {
         <div className="text-center">
           <p className="font-medium text-slate-800 text-sm">Upload target accounts CSV</p>
           <p className="text-xs text-slate-500 mt-1">
-            Required fields: <span className="font-mono text-slate-600">company_name, domain, industry, country</span>
+            Required fields: <span className="font-mono text-slate-600">account_name, linkedin, account_domain</span>
           </p>
         </div>
 
