@@ -58,6 +58,16 @@ export interface Account {
   revenue: string;
   status: string;
   logoColor: string;
+  people?: Person[];
+  whyMatters?: string;
+  whyKeywords?: string[];
+  opportunitySummary?: {
+    businessTrigger: string;
+    likelyPriorities: string;
+    potentialPainPoints: string;
+    recommendedAngle: string;
+  };
+  departmentIntel?: DepartmentIntelligence[];
 }
 
 export interface Person {
