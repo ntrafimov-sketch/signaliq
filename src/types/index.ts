@@ -4,6 +4,9 @@ export type SignalType =
   | 'Revenue Increase'
   | 'Revenue Decrease'
   | 'Revenue Plateau'
+  | 'Download Increase'
+  | 'Download Decrease'
+  | 'Download Plateau'
   | 'Hiring In Relevant Department'
   | 'High Season'
   | 'Using ASA'
@@ -19,6 +22,7 @@ export type SignalType =
 
 export type SignalCategory =
   | 'Revenue'
+  | 'Downloads'
   | 'Hiring'
   | 'Seasonality'
   | 'Ad Spend'

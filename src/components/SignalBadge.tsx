@@ -3,6 +3,7 @@ import type { Signal } from '../types';
 
 const categoryColors: Record<Signal['category'], { bg: string; text: string; border: string }> = {
   Revenue: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  Downloads: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' },
   Hiring: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
   Seasonality: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
   'Ad Spend': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },

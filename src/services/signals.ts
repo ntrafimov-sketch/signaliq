@@ -1,7 +1,7 @@
 import type { Signal } from '../types';
 import { getHiringSignals, getSocialSignals } from './amplemarket';
 import { getWebsiteVisitSignals, getCompetitorResearchSignals } from './demandbase';
-import { getRevenueSignals, getAdChannelSignals, getCompetitorUsageSignals } from './appmagic';
+import { getRevenueSignals, getDownloadSignals, getAdChannelSignals, getCompetitorUsageSignals } from './appmagic';
 import { getContentDownloadSignals, getWebinarSignals } from './hubspot';
 import { mockSignals } from '../data/mockData';
 
@@ -48,9 +48,10 @@ export async function getAccountSignals(domain: string, accountId: string, accou
   const allSignals: Signal[] = [];
   const today = new Date().toISOString().split('T')[0];
 
-  const [revenue, adChannels, competitorUsage, hiring, social, websiteVisits, competitorResearch, contentDownloads, webinars] =
+  const [revenue, downloads, adChannels, competitorUsage, hiring, social, websiteVisits, competitorResearch, contentDownloads, webinars] =
     await Promise.allSettled([
       getRevenueSignals(domain),           // AppMagic: Revenue Increase/Decrease/Plateau
+      getDownloadSignals(domain),           // AppMagic: Download Increase/Decrease/Plateau
       getAdChannelSignals(domain),          // AppMagic: Using ASA / Meta/TT / W2A
       getCompetitorUsageSignals(domain),    // AppMagic: Using Competitors
       getHiringSignals(domain),             // Amplemarket: Hiring In Relevant Department
@@ -65,6 +66,7 @@ export async function getAccountSignals(domain: string, accountId: string, accou
 
   const partialSignals: Partial<Signal>[] = [
     ...(revenue.status === 'fulfilled' ? revenue.value : []),
+    ...(downloads.status === 'fulfilled' ? downloads.value : []),
     ...(adChannels.status === 'fulfilled' ? adChannels.value : []),
     ...(competitorUsage.status === 'fulfilled' ? competitorUsage.value : []),
     ...(hiring.status === 'fulfilled' ? hiring.value : []),
@@ -131,6 +133,9 @@ export function categorizeSignal(signalType: string): Signal['category'] {
     'Revenue Increase': 'Revenue',
     'Revenue Decrease': 'Revenue',
     'Revenue Plateau': 'Revenue',
+    'Download Increase': 'Downloads',
+    'Download Decrease': 'Downloads',
+    'Download Plateau': 'Downloads',
     'Hiring In Relevant Department': 'Hiring',
     'High Season': 'Seasonality',
     'Using ASA': 'Ad Spend',
@@ -154,6 +159,9 @@ export function calculateAccountScore(signals: Signal[]): number {
     'Revenue Increase': 15,
     'Revenue Decrease': 5,
     'Revenue Plateau': 8,
+    'Download Increase': 12,
+    'Download Decrease': 4,
+    'Download Plateau': 6,
     'Hiring In Relevant Department': 12,
     'High Season': 8,
     'Using ASA': 10,

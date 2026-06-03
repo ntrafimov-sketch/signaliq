@@ -67,6 +67,17 @@ export async function getRevenueSignals(domain: string): Promise<Partial<Signal>
   }
 }
 
+// Download Increase / Decrease / Plateau
+export async function getDownloadSignals(domain: string): Promise<Partial<Signal>[]> {
+  if (!API_KEY) return getMockDownloadSignals(domain);
+  try {
+    const data = await fetchAppMagic(`/signals/downloads?domain=${encodeURIComponent(domain)}`);
+    return data.signals || [];
+  } catch {
+    return [];
+  }
+}
+
 // Using ASA / Using Meta/TT / Using W2A
 export async function getAdChannelSignals(domain: string): Promise<Partial<Signal>[]> {
   if (!API_KEY) return getMockAdChannelSignals(domain);
@@ -143,6 +154,30 @@ function getMockRevenueSignals(domain: string): Partial<Signal>[] {
     ],
     'spotify.com': [
       { type: 'Revenue Decrease', category: 'Revenue', source: 'AppMagic', title: 'Premium subscriber growth slowing', description: 'New subscriber growth decelerated with rising acquisition costs in saturated markets.', confidence: 'Medium', impact: 'Low' },
+    ],
+  };
+  return map[domain] || [];
+}
+
+function getMockDownloadSignals(domain: string): Partial<Signal>[] {
+  const map: Record<string, Partial<Signal>[]> = {
+    'uber.com': [
+      { type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'App installs up 28% MoM', description: 'Uber app downloads surged 28% month-over-month across iOS and Android, driven by LATAM expansion campaigns.', confidence: 'High', impact: 'High' },
+    ],
+    'revolut.com': [
+      { type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'Downloads up 22% in EU markets', description: 'Revolut seeing strong install growth across Germany, France, and Poland following major campaign push.', confidence: 'High', impact: 'High' },
+    ],
+    'bolt.eu': [
+      { type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'Bolt installs +35% in Africa', description: 'Strong download growth in Nigeria, Kenya, and South Africa as Bolt expands ride-hailing coverage.', confidence: 'High', impact: 'High' },
+    ],
+    'wise.com': [
+      { type: 'Download Plateau', category: 'Downloads', source: 'AppMagic', title: 'Download growth flattening at 2% MoM', description: 'Wise app install growth has stabilized in core markets — rising CAC suggests organic ceiling being hit.', confidence: 'Medium', impact: 'Medium' },
+    ],
+    'klarna.com': [
+      { type: 'Download Decrease', category: 'Downloads', source: 'AppMagic', title: 'Installs down 12% in US market', description: 'Klarna app downloads declined in the US following BNPL regulatory scrutiny and reduced paid UA spend.', confidence: 'Medium', impact: 'Medium' },
+    ],
+    'spotify.com': [
+      { type: 'Download Plateau', category: 'Downloads', source: 'AppMagic', title: 'Spotify installs flat in mature markets', description: 'Download growth plateaued in US/EU — market saturation driving focus to retention over acquisition.', confidence: 'High', impact: 'Low' },
     ],
   };
   return map[domain] || [];
