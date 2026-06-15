@@ -50,10 +50,10 @@ export async function getAccountSignals(domain: string, accountId: string, accou
 
   const [revenue, downloads, adChannels, competitorUsage, hiring, social, websiteVisits, competitorResearch, contentDownloads, webinars] =
     await Promise.allSettled([
-      getRevenueSignals(domain),           // AppMagic: Revenue Increase/Decrease/Plateau
-      getDownloadSignals(domain),           // AppMagic: Download Increase/Decrease/Plateau
-      getAdChannelSignals(domain),          // AppMagic: Using ASA / Meta/TT / W2A
-      getCompetitorUsageSignals(domain),    // AppMagic: Using Competitors
+      getRevenueSignals(domain, accountName),           // AppMagic: Revenue Increase/Decrease/Plateau
+      getDownloadSignals(domain, accountName),           // AppMagic: Download Increase/Decrease/Plateau
+      getAdChannelSignals(domain, accountName),          // AppMagic: Using ASA / Meta/TT / W2A
+      getCompetitorUsageSignals(domain, accountName),    // AppMagic: Using Competitors
       getHiringSignals(domain),             // Amplemarket: Hiring In Relevant Department
       getSocialSignals(domain),             // Amplemarket: Post from market leaders / Post mentioned keywords
       getWebsiteVisitSignals(domain),       // Demandbase: Was on our website

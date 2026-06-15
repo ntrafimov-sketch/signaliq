@@ -19,7 +19,7 @@ const tools: Anthropic.Tool[] = [
     description: 'Get revenue signals (Revenue Increase/Decrease/Plateau) from AppMagic for a company domain.',
     input_schema: {
       type: 'object',
-      properties: { domain: { type: 'string', description: 'Company domain e.g. uber.com' } },
+      properties: { domain: { type: 'string', description: 'Company domain e.g. uber.com' }, company_name: { type: 'string', description: 'Company name for app search' } },
       required: ['domain'],
     },
   },
@@ -28,7 +28,7 @@ const tools: Anthropic.Tool[] = [
     description: 'Get app download signals (Download Increase/Decrease/Plateau) from AppMagic for a company domain.',
     input_schema: {
       type: 'object',
-      properties: { domain: { type: 'string', description: 'Company domain' } },
+      properties: { domain: { type: 'string', description: 'Company domain' }, company_name: { type: 'string', description: 'Company name' } },
       required: ['domain'],
     },
   },
@@ -37,7 +37,7 @@ const tools: Anthropic.Tool[] = [
     description: 'Get advertising channel signals (Using ASA / Meta/TT / W2A) from AppMagic.',
     input_schema: {
       type: 'object',
-      properties: { domain: { type: 'string', description: 'Company domain' } },
+      properties: { domain: { type: 'string', description: 'Company domain' }, company_name: { type: 'string', description: 'Company name' } },
       required: ['domain'],
     },
   },
@@ -46,7 +46,7 @@ const tools: Anthropic.Tool[] = [
     description: 'Get competitor SDK usage signals from AppMagic.',
     input_schema: {
       type: 'object',
-      properties: { domain: { type: 'string', description: 'Company domain' } },
+      properties: { domain: { type: 'string', description: 'Company domain' }, company_name: { type: 'string', description: 'Company name' } },
       required: ['domain'],
     },
   },
@@ -106,13 +106,13 @@ const tools: Anthropic.Tool[] = [
   },
 ];
 
-async function executeTool(name: string, input: { domain: string }): Promise<Partial<Signal>[]> {
-  const { domain } = input;
+async function executeTool(name: string, input: { domain: string; company_name?: string }): Promise<Partial<Signal>[]> {
+  const { domain, company_name } = input;
   switch (name) {
-    case 'get_revenue_signals': return getRevenueSignals(domain);
-    case 'get_download_signals': return getDownloadSignals(domain);
-    case 'get_ad_channel_signals': return getAdChannelSignals(domain);
-    case 'get_competitor_usage_signals': return getCompetitorUsageSignals(domain);
+    case 'get_revenue_signals': return getRevenueSignals(domain, company_name);
+    case 'get_download_signals': return getDownloadSignals(domain, company_name);
+    case 'get_ad_channel_signals': return getAdChannelSignals(domain, company_name);
+    case 'get_competitor_usage_signals': return getCompetitorUsageSignals(domain, company_name);
     case 'get_hiring_signals': return getHiringSignals(domain);
     case 'get_social_signals': return getSocialSignals(domain);
     case 'get_website_visit_signals': return getWebsiteVisitSignals(domain);
