@@ -40,6 +40,11 @@ export function Layout({ children }: LayoutProps) {
     navigate('/login', { replace: true });
   }
 
+  function handleReset() {
+    localStorage.clear();
+    window.location.href = '/login';
+  }
+
   const initials = currentUser
     ? currentUser.name
         .split(' ')
@@ -125,6 +130,13 @@ export function Layout({ children }: LayoutProps) {
                 >
                   <LogOut className="w-4 h-4 text-gray-400" />
                   Sign out
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition-colors border-t border-gray-100"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Reset all data
                 </button>
               </div>
             )}
