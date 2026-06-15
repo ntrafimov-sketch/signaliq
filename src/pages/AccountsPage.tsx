@@ -99,8 +99,8 @@ export function AccountsPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Accounts</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Upload target accounts and identify the best opportunities based on market signals.</p>
+          <h1 className="text-xl font-semibold text-gray-900">Accounts</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Upload target accounts and identify the best opportunities based on market signals.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm">
@@ -127,9 +127,9 @@ export function AccountsPage() {
 
       {/* CSV Upload */}
       {isUploading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-          <p className="text-sm text-slate-600 font-medium">Enriching signals for uploaded accounts...</p>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-violet-700 animate-spin" />
+          <p className="text-sm text-gray-600 font-medium">Enriching signals for uploaded accounts...</p>
         </div>
       ) : (
         <CsvUpload />
@@ -163,16 +163,16 @@ export function AccountsPage() {
           onChange={e => setCountryFilter(e.target.value)}
           className="w-40"
         />
-        <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden">
+        <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
           <button
             onClick={() => setViewMode('table')}
-            className={cn('p-2 transition-colors', viewMode === 'table' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600')}
+            className={cn('p-2 transition-colors', viewMode === 'table' ? 'bg-gray-100 text-gray-800' : 'text-gray-400 hover:text-gray-600')}
           >
             <List className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('grid')}
-            className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600')}
+            className={cn('p-2 transition-colors', viewMode === 'grid' ? 'bg-gray-100 text-gray-800' : 'text-gray-400 hover:text-gray-600')}
           >
             <LayoutGrid className="w-4 h-4" />
           </button>
@@ -181,27 +181,27 @@ export function AccountsPage() {
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-slate-400" />
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-20 gap-3">
+          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+            <Building2 className="w-6 h-6 text-gray-400" />
           </div>
           <div className="text-center">
-            <p className="font-medium text-slate-700">No accounts yet</p>
-            <p className="text-sm text-slate-500 mt-1">Upload a CSV of target accounts to start surfacing buying signals.</p>
+            <p className="font-medium text-gray-700">No accounts yet</p>
+            <p className="text-sm text-gray-500 mt-1">Upload a CSV of target accounts to start surfacing buying signals.</p>
           </div>
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map(account => (
             <Link key={account.id} to={`/accounts/${account.id}`}>
-              <div className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow cursor-pointer">
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer">
                 <div className="flex items-start justify-between mb-3">
                   <Avatar name={account.company_name} size="md" />
                   <ScoreBadge score={account.score} tier={account.scoreLabel} />
                 </div>
-                <h3 className="font-semibold text-slate-900">{account.company_name}</h3>
-                <p className="text-xs text-slate-500">{account.domain}</p>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                <h3 className="font-semibold text-gray-900">{account.company_name}</h3>
+                <p className="text-xs text-gray-500">{account.domain}</p>
+                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                   <span>{account.industry}</span>
                   <div className="flex items-center gap-1">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
@@ -213,53 +213,53 @@ export function AccountsPage() {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/50">
+              <tr className="border-b border-gray-100 bg-gray-50/50">
                 <th className="px-4 py-3 text-left">
-                  <button onClick={() => handleSort('company_name')} className="flex items-center gap-1 text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-700">
+                  <button onClick={() => handleSort('company_name')} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700">
                     Company <SortIcon field="company_name" />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left hidden md:table-cell">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Industry</span>
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Industry</span>
                 </th>
                 <th className="px-4 py-3 text-left hidden lg:table-cell">
-                  <button onClick={() => handleSort('employees')} className="flex items-center gap-1 text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-700">
+                  <button onClick={() => handleSort('employees')} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700">
                     <Users className="w-3.5 h-3.5" />
                     Employees <SortIcon field="employees" />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left">
-                  <button onClick={() => handleSort('score')} className="flex items-center gap-1 text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-700">
+                  <button onClick={() => handleSort('score')} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700">
                     Score <SortIcon field="score" />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left">
-                  <button onClick={() => handleSort('signals')} className="flex items-center gap-1 text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-700">
+                  <button onClick={() => handleSort('signals')} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700">
                     Signals <SortIcon field="signals" />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left hidden sm:table-cell">
-                  <button onClick={() => handleSort('lastUpdated')} className="flex items-center gap-1 text-xs font-semibold text-slate-500 uppercase tracking-wide hover:text-slate-700">
+                  <button onClick={() => handleSort('lastUpdated')} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700">
                     Last Updated <SortIcon field="lastUpdated" />
                   </button>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-gray-100">
               {filtered.map(account => (
                 <tr
                   key={account.id}
-                  className="hover:bg-slate-50 cursor-pointer transition-colors"
+                  className="hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   <td className="px-4 py-3">
                     <Link to={`/accounts/${account.id}`} className="flex items-center gap-3">
                       <Avatar name={account.company_name} size="sm" />
                       <div>
-                        <p className="font-medium text-slate-900 text-sm">{account.company_name}</p>
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                        <p className="font-medium text-gray-900 text-sm">{account.company_name}</p>
+                        <div className="flex items-center gap-1 text-xs text-gray-400">
                           <Globe className="w-3 h-3" />
                           {account.domain}
                         </div>
@@ -267,22 +267,22 @@ export function AccountsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-sm text-slate-600">{account.industry}</span>
+                    <span className="text-sm text-gray-600">{account.industry}</span>
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    <span className="text-sm text-slate-600">{account.employees > 0 ? account.employees.toLocaleString() : '—'}</span>
+                    <span className="text-sm text-gray-600">{account.employees > 0 ? account.employees.toLocaleString() : '—'}</span>
                   </td>
                   <td className="px-4 py-3">
                     <ScoreBadge score={account.score} tier={account.scoreLabel} />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5 text-sm text-slate-700">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-700">
                       <Zap className="w-4 h-4 text-amber-500" />
                       <span>{account.signals.length}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
-                    <span className="text-sm text-slate-500">{account.lastUpdated}</span>
+                    <span className="text-sm text-gray-500">{account.lastUpdated}</span>
                   </td>
                 </tr>
               ))}

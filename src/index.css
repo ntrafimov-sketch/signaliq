@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 * {
   box-sizing: border-box;
@@ -6,8 +7,8 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #f8f9fa;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #f9fafb;
   color: #111827;
   -webkit-font-smoothing: antialiased;
 }

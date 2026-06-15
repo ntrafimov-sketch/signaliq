@@ -161,23 +161,23 @@ export function CsvUpload() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-dashed border-slate-300 p-6">
+    <div className="bg-white rounded-xl border border-dashed border-gray-200 p-6">
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         className={cn(
           'flex flex-col items-center justify-center gap-3 py-6 rounded-lg transition-colors',
-          isDragging && 'bg-indigo-50 border-2 border-dashed border-indigo-300'
+          isDragging && 'bg-violet-50 border-2 border-dashed border-violet-300'
         )}
       >
-        <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-          <Upload className="w-6 h-6 text-slate-500" />
+        <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+          <Upload className="w-6 h-6 text-gray-500" />
         </div>
         <div className="text-center">
-          <p className="font-medium text-slate-800 text-sm">Upload target accounts CSV</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Required fields: <span className="font-mono text-slate-600">account_name, linkedin, account_domain</span>
+          <p className="font-medium text-gray-500 text-sm">Upload target accounts CSV</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Required fields: <span className="font-mono text-gray-500">account_name, linkedin, account_domain</span>
           </p>
         </div>
 
@@ -189,8 +189,8 @@ export function CsvUpload() {
         )}
 
         {agentStatus && (
-          <div className="flex items-center gap-2 text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-sm">
-            <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          <div className="flex items-center gap-2 text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 text-sm">
+            <span className="w-4 h-4 border-2 border-violet-200 border-t-transparent rounded-full animate-spin flex-shrink-0" />
             {agentStatus}
           </div>
         )}
