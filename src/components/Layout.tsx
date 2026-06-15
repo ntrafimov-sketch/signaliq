@@ -1,6 +1,8 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Bell, Settings, Search, Zap, BarChart2, List, Users, Activity } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Bell, Settings, Search, Zap, BarChart2, List, Users, Activity, LogOut, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useAuthStore } from '../store/useAuthStore';
 
 const navItems = [
   { label: 'Accounts', path: '/accounts', icon: Users },
@@ -15,6 +17,37 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const logout = useAuthStore((s) => s.logout);
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  function handleLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
+
+  const initials = currentUser
+    ? currentUser.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : '?';
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -75,9 +108,35 @@ export function Layout({ children }: LayoutProps) {
             )}>
               <Settings className="w-4.5 h-4.5" />
             </Link>
-            <button className="ml-1 w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center hover:bg-indigo-700 transition-colors">
-              JM
-            </button>
+
+            {/* User avatar + dropdown */}
+            <div className="relative ml-1" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen((o) => !o)}
+                className="flex items-center gap-1.5 rounded-full pl-1 pr-2 py-1 hover:bg-slate-100 transition-colors"
+              >
+                <div className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-semibold flex items-center justify-center">
+                  {initials}
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-1.5 w-56 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-50">
+                  <div className="px-3 py-2 border-b border-slate-100">
+                    <p className="text-sm font-medium text-slate-900 truncate">{currentUser?.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{currentUser?.email}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4 text-slate-400" />
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { AccountsPage } from './pages/AccountsPage';
 import { AccountDetailPage } from './pages/AccountDetailPage';
 import { PersonDetailPage } from './pages/PersonDetailPage';
@@ -8,6 +9,8 @@ import { SignalsPage } from './pages/SignalsPage';
 import { ListsPage } from './pages/ListsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,61 +26,80 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* Protected routes */}
           <Route path="/" element={<Navigate to="/accounts" replace />} />
           <Route
             path="/accounts"
             element={
-              <Layout>
-                <AccountsPage />
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <AccountsPage />
+                </Layout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/accounts/:id"
             element={
-              <Layout>
-                <AccountDetailPage />
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <AccountDetailPage />
+                </Layout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/accounts/:id/people/:personId"
             element={
-              <Layout>
-                <PersonDetailPage />
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <PersonDetailPage />
+                </Layout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/signals"
             element={
-              <Layout>
-                <SignalsPage />
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <SignalsPage />
+                </Layout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/lists"
             element={
-              <Layout>
-                <ListsPage />
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <ListsPage />
+                </Layout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/reports"
             element={
-              <Layout>
-                <ReportsPage />
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <ReportsPage />
+                </Layout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/settings"
             element={
-              <Layout>
-                <SettingsPage />
-              </Layout>
+              <ProtectedRoute>
+                <Layout>
+                  <SettingsPage />
+                </Layout>
+              </ProtectedRoute>
             }
           />
         </Routes>
