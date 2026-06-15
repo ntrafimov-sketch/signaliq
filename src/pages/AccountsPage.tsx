@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Download, Plus, Zap, Building2, Globe, Users, ChevronUp, ChevronDown,
-  CheckCircle2, Loader2, LayoutGrid, List, Play
+  CheckCircle2, Loader2, LayoutGrid, List, Play, Bot
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -11,7 +11,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Badge } from '../components/ui/Badge';
 import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
-import { enrichAccountWithAgent } from '../services/claudeAgent';
+import { enrichAccountWithManagedAgent, setupAgent, clearAgentConfig } from '../services/managedAgent';
 import { calculateAccountScore } from '../services/signals';
 import type { Account } from '../types';
 import { cn } from '../lib/utils';
@@ -65,17 +65,17 @@ export function AccountsPage() {
   const [sortField, setSortField] = useState<SortField>('score');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [enrichingIds, setEnrichingIds] = useState<Set<string>>(new Set());
+  const [agentReady, setAgentReady] = useState<boolean | null>(null);
+  const [progressMessages, setProgressMessages] = useState<Record<string, string>>({});
 
   const startEnrichment = useCallback(async (account: Account) => {
     setEnrichingIds(prev => new Set(prev).add(account.id));
     updateAccount(account.id, { enrichmentStatus: 'enriching' });
     try {
-      const result = await enrichAccountWithAgent({
-        id: account.id,
-        domain: account.domain,
-        company_name: account.company_name,
-        industry: account.industry,
-      });
+      const result = await enrichAccountWithManagedAgent(
+        { id: account.id, domain: account.domain, company_name: account.company_name, industry: account.industry },
+        (msg) => setProgressMessages(prev => ({ ...prev, [account.id]: msg })),
+      );
       const score = calculateAccountScore(result.signals);
       const scoreLabel = (score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold') as Account['scoreLabel'];
       updateAccount(account.id, {
@@ -89,8 +89,24 @@ export function AccountsPage() {
       updateAccount(account.id, { enrichmentStatus: 'error' });
     } finally {
       setEnrichingIds(prev => { const s = new Set(prev); s.delete(account.id); return s; });
+      setProgressMessages(prev => { const n = { ...prev }; delete n[account.id]; return n; });
     }
   }, [updateAccount]);
+
+  const handleSetupAgent = useCallback(async () => {
+    setAgentReady(false);
+    try {
+      await setupAgent();
+      setAgentReady(true);
+    } catch {
+      setAgentReady(null);
+    }
+  }, []);
+
+  const handleResetAgent = useCallback(() => {
+    clearAgentConfig();
+    setAgentReady(null);
+  }, []);
 
   const filtered = accounts
     .filter(a => {
@@ -136,6 +152,10 @@ export function AccountsPage() {
             <Download className="w-4 h-4" />
             Export
           </Button>
+          <Button variant="secondary" size="sm" onClick={handleSetupAgent} disabled={agentReady === false}>
+            <Bot className="w-4 h-4" />
+            {agentReady === true ? 'Agent ready' : 'Setup agent'}
+          </Button>
           <Button variant="primary" size="sm">
             <Plus className="w-4 h-4" />
             New list
@@ -151,6 +171,23 @@ export function AccountsPage() {
             Imported {uploadSuccess.count} accounts · Signals enriched in {uploadSuccess.duration.toFixed(1)}s
           </div>
           <button onClick={() => setUploadSuccess(null)} className="text-green-600 hover:text-green-800 text-xs">Dismiss</button>
+        </div>
+      )}
+
+      {/* Agent status */}
+      {agentReady === false && (
+        <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 text-sm text-violet-700">
+          <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+          Setting up SignalIQ enrichment agent on Anthropic...
+        </div>
+      )}
+      {agentReady === true && (
+        <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2 text-green-700 text-sm font-medium">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            Managed agent ready · configured with 10 signal connectors
+          </div>
+          <button onClick={handleResetAgent} className="text-green-600 hover:text-green-800 text-xs">Reset</button>
         </div>
       )}
 
@@ -316,9 +353,9 @@ export function AccountsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     {enrichingIds.has(account.id) ? (
-                      <div className="flex items-center justify-end gap-1.5 text-xs text-violet-700">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Enriching...</span>
+                      <div className="flex items-center justify-end gap-1.5 text-xs text-violet-700 max-w-48 text-right">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                        <span className="truncate">{progressMessages[account.id] || 'Starting agent...'}</span>
                       </div>
                     ) : account.enrichmentStatus === 'done' ? (
                       <div className="flex items-center justify-end gap-1 text-xs text-green-600">
