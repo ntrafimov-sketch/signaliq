@@ -284,7 +284,9 @@ export function AccountsPage() {
                     Last Updated <SortIcon field="lastUpdated" />
                   </button>
                 </th>
-                <th className="px-4 py-3" />
+                <th className="px-4 py-3 text-left">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -341,7 +343,7 @@ export function AccountsPage() {
                       >
                         Retry
                       </button>
-                    ) : account.enrichmentStatus === 'pending' ? (
+                    ) : (account.enrichmentStatus === 'pending' || !account.enrichmentStatus) ? (
                       <button
                         onClick={(e) => { e.preventDefault(); startEnrichment(account); }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white text-xs font-medium transition-colors"
