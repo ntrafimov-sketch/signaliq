@@ -11,7 +11,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Badge } from '../components/ui/Badge';
 import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
-import { enrichAccountWithManagedAgent, setupAgent, clearAgentConfig } from '../services/managedAgent';
+import { enrichAccountWithManagedAgent, isAgentConfigured } from '../services/managedAgent';
 import { calculateAccountScore } from '../services/signals';
 import type { Account } from '../types';
 import { cn } from '../lib/utils';
@@ -65,7 +65,6 @@ export function AccountsPage() {
   const [sortField, setSortField] = useState<SortField>('score');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [enrichingIds, setEnrichingIds] = useState<Set<string>>(new Set());
-  const [agentReady, setAgentReady] = useState<boolean | null>(null);
   const [progressMessages, setProgressMessages] = useState<Record<string, string>>({});
 
   const startEnrichment = useCallback(async (account: Account) => {
@@ -93,20 +92,6 @@ export function AccountsPage() {
     }
   }, [updateAccount]);
 
-  const handleSetupAgent = useCallback(async () => {
-    setAgentReady(false);
-    try {
-      await setupAgent();
-      setAgentReady(true);
-    } catch {
-      setAgentReady(null);
-    }
-  }, []);
-
-  const handleResetAgent = useCallback(() => {
-    clearAgentConfig();
-    setAgentReady(null);
-  }, []);
 
   const filtered = accounts
     .filter(a => {
@@ -152,10 +137,6 @@ export function AccountsPage() {
             <Download className="w-4 h-4" />
             Export
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleSetupAgent} disabled={agentReady === false}>
-            <Bot className="w-4 h-4" />
-            {agentReady === true ? 'Agent ready' : 'Setup agent'}
-          </Button>
           <Button variant="primary" size="sm">
             <Plus className="w-4 h-4" />
             New list
@@ -174,20 +155,11 @@ export function AccountsPage() {
         </div>
       )}
 
-      {/* Agent status */}
-      {agentReady === false && (
-        <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-4 py-3 text-sm text-violet-700">
-          <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
-          Setting up SignalIQ enrichment agent on Anthropic...
-        </div>
-      )}
-      {agentReady === true && (
-        <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-          <div className="flex items-center gap-2 text-green-700 text-sm font-medium">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-            Managed agent ready · configured with 10 signal connectors
-          </div>
-          <button onClick={handleResetAgent} className="text-green-600 hover:text-green-800 text-xs">Reset</button>
+      {/* Agent not configured warning */}
+      {!isAgentConfigured() && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <Bot className="w-4 h-4 flex-shrink-0" />
+          Agent not configured. Run <code className="font-mono bg-amber-100 px-1 rounded">node scripts/create-agent.mjs</code> and add the IDs to <code className="font-mono bg-amber-100 px-1 rounded">.env</code>.
         </div>
       )}
 
