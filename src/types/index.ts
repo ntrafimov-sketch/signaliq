@@ -1,4 +1,5 @@
 export type ScoreLabel = 'Hot' | 'Warm' | 'Cold';
+export type EnrichmentStatus = 'pending' | 'enriching' | 'done' | 'error';
 
 export type SignalType =
   | 'Revenue Increase'
@@ -62,6 +63,7 @@ export interface Account {
   revenue: string;
   status: string;
   logoColor: string;
+  enrichmentStatus?: EnrichmentStatus;
   people?: Person[];
   whyMatters?: string;
   whyKeywords?: string[];

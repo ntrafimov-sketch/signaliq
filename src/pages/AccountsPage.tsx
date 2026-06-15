@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Download, Plus, Zap, Building2, Globe, Users, ChevronUp, ChevronDown,
-  CheckCircle2, Loader2, LayoutGrid, List
+  CheckCircle2, Loader2, LayoutGrid, List, Play
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -11,6 +11,8 @@ import { Avatar } from '../components/ui/Avatar';
 import { Badge } from '../components/ui/Badge';
 import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
+import { enrichAccountWithAgent } from '../services/claudeAgent';
+import { calculateAccountScore } from '../services/signals';
 import type { Account } from '../types';
 import { cn } from '../lib/utils';
 
@@ -54,7 +56,7 @@ function ScoreBadge({ score, tier }: { score: number; tier: Account['scoreLabel'
 }
 
 export function AccountsPage() {
-  const { accounts, isUploading, uploadSuccess, setUploadSuccess } = useStore();
+  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount } = useStore();
   const [search, setSearch] = useState('');
   const [scoreFilter, setScoreFilter] = useState('all');
   const [industryFilter, setIndustryFilter] = useState('all');
@@ -62,6 +64,33 @@ export function AccountsPage() {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [sortField, setSortField] = useState<SortField>('score');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [enrichingIds, setEnrichingIds] = useState<Set<string>>(new Set());
+
+  const startEnrichment = useCallback(async (account: Account) => {
+    setEnrichingIds(prev => new Set(prev).add(account.id));
+    updateAccount(account.id, { enrichmentStatus: 'enriching' });
+    try {
+      const result = await enrichAccountWithAgent({
+        id: account.id,
+        domain: account.domain,
+        company_name: account.company_name,
+        industry: account.industry,
+      });
+      const score = calculateAccountScore(result.signals);
+      const scoreLabel = (score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold') as Account['scoreLabel'];
+      updateAccount(account.id, {
+        signals: result.signals,
+        score,
+        scoreLabel,
+        enrichmentStatus: 'done',
+        lastUpdated: 'Just now',
+      });
+    } catch {
+      updateAccount(account.id, { enrichmentStatus: 'error' });
+    } finally {
+      setEnrichingIds(prev => { const s = new Set(prev); s.delete(account.id); return s; });
+    }
+  }, [updateAccount]);
 
   const filtered = accounts
     .filter(a => {
@@ -246,6 +275,7 @@ export function AccountsPage() {
                     Last Updated <SortIcon field="lastUpdated" />
                   </button>
                 </th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -283,6 +313,34 @@ export function AccountsPage() {
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <span className="text-sm text-gray-500">{account.lastUpdated}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {enrichingIds.has(account.id) ? (
+                      <div className="flex items-center justify-end gap-1.5 text-xs text-violet-700">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Enriching...</span>
+                      </div>
+                    ) : account.enrichmentStatus === 'done' ? (
+                      <div className="flex items-center justify-end gap-1 text-xs text-green-600">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Done</span>
+                      </div>
+                    ) : account.enrichmentStatus === 'error' ? (
+                      <button
+                        onClick={(e) => { e.preventDefault(); startEnrichment(account); }}
+                        className="text-xs text-red-500 hover:text-red-700 underline"
+                      >
+                        Retry
+                      </button>
+                    ) : account.enrichmentStatus === 'pending' ? (
+                      <button
+                        onClick={(e) => { e.preventDefault(); startEnrichment(account); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 text-white text-xs font-medium transition-colors"
+                      >
+                        <Play className="w-3 h-3 fill-white" />
+                        Start
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               ))}
