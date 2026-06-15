@@ -6,7 +6,10 @@ import { Button } from './ui/Button';
 import type { Account } from '../types';
 import { useStore } from '../store/useStore';
 import { enrichAccounts } from '../services/signals';
+import { enrichAccountWithAgent } from '../services/claudeAgent';
 import { mockSignals, mockDepartmentIntel } from '../data/mockData';
+
+const USE_CLAUDE_AGENT = !!import.meta.env.VITE_ANTHROPIC_API_KEY;
 
 const REQUIRED_FIELDS = ['account_name', 'linkedin', 'account_domain'];
 
@@ -21,6 +24,7 @@ interface CsvRow {
 export function CsvUpload() {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentStatus, setAgentStatus] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { addAccounts, setUploading, setUploadSuccess } = useStore();
 
@@ -76,26 +80,47 @@ export function CsvUpload() {
         }));
 
         try {
-          const result = await enrichAccounts(
-            newAccounts.map(a => ({ id: a.id, domain: a.domain, company_name: a.company_name, industry: a.industry }))
-          );
+          let enrichedAccounts;
 
-          // Update accounts with enriched signals and scores
-          const enrichedAccounts = newAccounts.map(account => {
-            const signals = result.signals.filter(s => s.accountId === account.id);
-            const existingMockSignals = mockSignals.filter(s => s.accountId === account.id);
-            const allSignals = [...existingMockSignals, ...signals];
-            const score = Math.min(100, allSignals.length * 7 + Math.floor(Math.random() * 20));
-            const scoreLabel = (score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold') as import('../types').ScoreLabel;
-            return { ...account, signals: allSignals, score, scoreLabel };
-          });
+          if (USE_CLAUDE_AGENT) {
+            // Claude Agent enrichment: call each account through the agent
+            const agentResults = await Promise.all(
+              newAccounts.map(account =>
+                enrichAccountWithAgent(
+                  { id: account.id, domain: account.domain, company_name: account.company_name, industry: account.industry },
+                  (msg) => setAgentStatus(msg)
+                )
+              )
+            );
+            enrichedAccounts = newAccounts.map((account, i) => {
+              const { signals } = agentResults[i];
+              const score = Math.min(100, signals.length * 7 + Math.floor(Math.random() * 20));
+              const scoreLabel = (score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold') as import('../types').ScoreLabel;
+              return { ...account, signals, score, scoreLabel };
+            });
+          } else {
+            // Fallback: direct service calls
+            const result = await enrichAccounts(
+              newAccounts.map(a => ({ id: a.id, domain: a.domain, company_name: a.company_name, industry: a.industry }))
+            );
+            enrichedAccounts = newAccounts.map(account => {
+              const signals = result.signals.filter(s => s.accountId === account.id);
+              const existingMockSignals = mockSignals.filter(s => s.accountId === account.id);
+              const allSignals = [...existingMockSignals, ...signals];
+              const score = Math.min(100, allSignals.length * 7 + Math.floor(Math.random() * 20));
+              const scoreLabel = (score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold') as import('../types').ScoreLabel;
+              return { ...account, signals: allSignals, score, scoreLabel };
+            });
+          }
 
           addAccounts(enrichedAccounts);
+          setAgentStatus(null);
 
           const duration = (Date.now() - startTime) / 1000;
           setUploadSuccess({ count: enrichedAccounts.length, duration });
         } catch (err) {
           console.error('Enrichment error:', err);
+          setAgentStatus(null);
           addAccounts(newAccounts);
           setUploadSuccess({ count: newAccounts.length, duration: (Date.now() - startTime) / 1000 });
         } finally {
@@ -160,6 +185,13 @@ export function CsvUpload() {
           <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             {error}
+          </div>
+        )}
+
+        {agentStatus && (
+          <div className="flex items-center gap-2 text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-sm">
+            <span className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            {agentStatus}
           </div>
         )}
 
