@@ -12,6 +12,7 @@ import { Badge } from '../components/ui/Badge';
 import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
 import { enrichAccountWithManagedAgent, isAgentConfigured } from '../services/managedAgent';
+import { enrichDirect } from '../services/directEnrich';
 import { calculateAccountScore } from '../services/signals';
 import type { Account } from '../types';
 import { cn } from '../lib/utils';
@@ -71,7 +72,8 @@ export function AccountsPage() {
     setEnrichingIds(prev => new Set(prev).add(account.id));
     updateAccount(account.id, { enrichmentStatus: 'enriching' });
     try {
-      const result = await enrichAccountWithManagedAgent(
+      const enrichFn = isAgentConfigured() ? enrichAccountWithManagedAgent : enrichDirect;
+      const result = await enrichFn(
         { id: account.id, domain: account.domain, company_name: account.company_name, industry: account.industry },
         (msg) => setProgressMessages(prev => ({ ...prev, [account.id]: msg })),
       );

@@ -50,14 +50,14 @@ async function findAppsByDomain(domain: string, companyName: string): Promise<Ap
   for (const query of queries) {
     for (const store of STORES) {
       try {
+        const today = new Date().toISOString().split('T')[0];
         const results = await apiGet('/tops/advanced-search', {
-          store,
-          description: query,
-          size: 10,
-          sort: 'revenue',
-          revenue_from: 0,
+          storeId: store,
+          query,
+          country: 'US',
+          limit: 10,
           release_date_gte: '2010-01-01',
-          release_date_lte: '2030-01-01',
+          release_date_lte: today,
         }) as unknown[];
 
         if (!Array.isArray(results) || results.length === 0) continue;
