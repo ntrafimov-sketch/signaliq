@@ -13,11 +13,16 @@ Store codes:
 import base64
 import json
 import os
+import ssl
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
+
+_ssl_ctx = ssl.create_default_context()
+_ssl_ctx.check_hostname = False
+_ssl_ctx.verify_mode = ssl.CERT_NONE
 
 from mcp.server.fastmcp import FastMCP
 
@@ -40,7 +45,7 @@ def _auth_header() -> str:
 def _request(req: urllib.request.Request, retries: int = 3) -> Any:
     for attempt in range(retries):
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=30, context=_ssl_ctx) as resp:
                 return json.loads(resp.read())
         except urllib.error.HTTPError as e:
             if e.code == 429:
