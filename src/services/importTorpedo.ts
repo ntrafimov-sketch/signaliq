@@ -1,60 +1,5 @@
 import type { Signal, Account, Person } from '../types';
 
-interface TorpedoCompanyIntel {
-  name: string;
-  domain: string;
-  hq?: string;
-  headcount?: number;
-  industry?: string;
-  stage?: string;
-  valuation?: string;
-  total_funding_usd?: number;
-  latest_round?: { type: string; amount_usd: number; date: string; investors: string[] };
-  business_model?: string;
-  tech_stack_notable?: string[];
-  highlights?: string[];
-}
-
-interface TorpedoRevenuePoint {
-  date: string;
-  revenue: number;
-  downloads: number;
-  note?: string;
-}
-
-interface TorpedoSdk {
-  name: string;
-  category: string;
-}
-
-interface TorpedoCrmHistory {
-  deals?: Array<{ id: string; name: string; stage: string; amount_usd: number | null; created: string; closed?: string; note?: string }>;
-  contacts_mapped?: Array<{ name: string; title: string; email?: string; last_contacted?: string; last_email_sent?: string }>;
-}
-
-interface TorpedoSignal {
-  signal: string;
-  implication: string;
-}
-
-interface TorpedoContact {
-  name: string;
-  title: string;
-  linkedin?: string;
-  email?: string;
-  location?: string;
-  in_crm?: boolean;
-  last_contacted?: string;
-  notes?: string;
-}
-
-interface TorpedoStrategy {
-  situation_summary?: string;
-  angles?: Array<{ angle: string; rationale: string; strength: string; contacts: string[] }>;
-  recommended_contacts?: Array<{ name: string; title: string; priority: number; reason: string; approach: string }>;
-  cautions?: string[];
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TorpedoEntry = { type: string; data: any; notes?: string; store?: string; summary?: any };
 
@@ -84,7 +29,7 @@ export function importTorpedoJson(
         updates.industry = d.industry || '';
         updates.revenue = d.funding || (d.total_funding_usd
           ? `$${(d.total_funding_usd / 1_000_000).toFixed(0)}M raised` : '');
-        updates.status = d.stage || d.amplemarket_account_status?.includes('customer') ? 'Customer' : 'Private';
+        updates.status = d.amplemarket_account_status?.includes('customer') ? 'Customer' : (d.stage || 'Private');
         updates.founded = d.founded ? String(d.founded) : (d.latest_round?.date?.slice(0, 4) || '');
         if (d.funding || d.latest_round) {
           signals.push({
@@ -99,7 +44,8 @@ export function importTorpedoJson(
       }
 
       case 'revenue_history': {
-        const points = entry.data.filter(p => !p.note?.includes('Partial'));
+        const points: { month?: string; date?: string; revenue: number; downloads: number; note?: string }[] =
+          entry.data.filter((p: { note?: string }) => !p.note?.includes('Partial'));
         if (points.length >= 4) {
           const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
           const recent = avg(points.slice(-3).map(p => p.revenue));
@@ -117,7 +63,6 @@ export function importTorpedoJson(
             description: `${entry.store || 'App Store'} (WW). ${entry.notes || ''}`.trim(),
           });
 
-          // Downloads trend
           const dRecent = avg(points.slice(-3).map(p => p.downloads));
           const dPrior = avg(points.slice(-6, -3).map(p => p.downloads));
           const dPct = dPrior > 0 ? Math.round(((dRecent - dPrior) / dPrior) * 100) : 0;
@@ -137,17 +82,15 @@ export function importTorpedoJson(
       case 'sdks': {
         const PAYWALL = ['revenuecat', 'superwall', 'purchasely', 'qonversion', 'apphud'];
         const LIFECYCLE = ['braze', 'customer.io', 'customerio', 'clevertap', 'leanplum', 'intercom'];
-        const sdkNames = entry.data.map(s => s.name.toLowerCase());
-        const paywall = entry.data.filter(s => PAYWALL.some(p => s.name.toLowerCase().includes(p)));
-        const lifecycle = entry.data.filter(s => LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
-        void sdkNames;
+        const paywall = entry.data.filter((s: { name: string }) => PAYWALL.some(p => s.name.toLowerCase().includes(p)));
+        const lifecycle = entry.data.filter((s: { name: string }) => LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
         if (paywall.length) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Using Competitors', category: 'Competitive', source: 'AppMagic',
             date: today, confidence: 'High', impact: 'High',
-            title: `Paywall SDK: ${paywall.map(s => s.name).join(' + ')}`,
-            description: `Detected competitor subscription/paywall SDKs: ${paywall.map(s => s.name).join(', ')}. Direct displacement opportunity.`,
+            title: `Paywall SDK: ${paywall.map((s: { name: string }) => s.name).join(' + ')}`,
+            description: `Detected competitor subscription/paywall SDKs: ${paywall.map((s: { name: string }) => s.name).join(', ')}. Direct displacement opportunity.`,
           });
         }
         if (lifecycle.length) {
@@ -155,8 +98,8 @@ export function importTorpedoJson(
             id: genId(), accountId, accountName: companyName,
             type: 'Using Competitors', category: 'Competitive', source: 'AppMagic',
             date: today, confidence: 'High', impact: 'Medium',
-            title: `Lifecycle: ${lifecycle.map(s => s.name).join(' + ')}`,
-            description: `Lifecycle/CRM SDKs: ${lifecycle.map(s => s.name).join(', ')}.`,
+            title: `Lifecycle: ${lifecycle.map((s: { name: string }) => s.name).join(' + ')}`,
+            description: `Lifecycle/CRM SDKs: ${lifecycle.map((s: { name: string }) => s.name).join(', ')}.`,
           });
         }
         break;
@@ -165,7 +108,7 @@ export function importTorpedoJson(
       case 'crm_history': {
         const d = entry.data;
         if (d.deals?.length) {
-          for (const deal of d.deals) {
+          for (const deal of d.deals as { name: string; stage: string; amount_usd?: number; created: string; closed?: string; note?: string }[]) {
             signals.push({
               id: genId(), accountId, accountName: companyName,
               type: 'Content Download', category: 'Content', source: 'HubSpot',
@@ -176,13 +119,9 @@ export function importTorpedoJson(
           }
         }
         if (d.contacts_mapped?.length) {
-          const recent = d.contacts_mapped
-            .filter((c: { last_contacted?: string; last_email_sent?: string }) => c.last_contacted || c.last_email_sent)
-            .sort((a: { last_contacted?: string; last_email_sent?: string }, b: { last_contacted?: string; last_email_sent?: string }) => {
-              const dateA = a.last_contacted || a.last_email_sent || '';
-              const dateB = b.last_contacted || b.last_email_sent || '';
-              return dateB.localeCompare(dateA);
-            })
+          const recent = (d.contacts_mapped as { name: string; title: string; last_contacted?: string; last_email_sent?: string }[])
+            .filter(c => c.last_contacted || c.last_email_sent)
+            .sort((a, b) => (b.last_contacted || b.last_email_sent || '').localeCompare(a.last_contacted || a.last_email_sent || ''))
             .slice(0, 5);
           if (recent.length) {
             signals.push({
@@ -191,74 +130,22 @@ export function importTorpedoJson(
               date: recent[0].last_contacted || recent[0].last_email_sent || today,
               confidence: 'High', impact: 'Medium',
               title: `${d.contacts_mapped.length} contacts in HubSpot CRM`,
-              description: `Recently contacted: ${recent.map((c: { name: string; title: string }) => `${c.name} (${c.title})`).join(', ')}.`,
+              description: `Recently contacted: ${recent.map(c => `${c.name} (${c.title})`).join(', ')}.`,
             });
           }
         }
         break;
       }
 
-      case 'signals': {
-        for (const s of entry.data) {
-          signals.push({
-            id: genId(), accountId, accountName: companyName,
-            type: 'Post mentioned specific keywords', category: 'Social', source: 'Research',
-            date: today, confidence: 'High', impact: 'Medium',
-            title: s.signal,
-            description: s.implication || s.relevance || s.detail || '',
-          });
-        }
-        break;
-      }
-
-      case 'contacts': {
-        const people: Person[] = entry.data.map((c: TorpedoContact, i: number) => ({
-          id: genId('person'),
-          accountId,
-          name: c.name,
-          title: c.title,
-          company: companyName,
-          department: guessDepartment(c.title),
-          location: c.location || '',
-          tenure: '',
-          linkedin: c.linkedin || '',
-          influence: guessInfluence(c.title) as 'High' | 'Medium' | 'Low',
-          avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
-        }));
-        updates.people = people;
-        break;
-      }
-
-      case 'strategy': {
-        const d = entry.data;
-        if (d.situation_summary) updates.whyMatters = d.situation_summary;
-        const angles = d.angles || [];
-        if (angles.length) {
-          updates.whyKeywords = angles.map((a: { angle: string; detail?: string; rationale?: string; pitch_framing?: string }) => a.angle.split(' ').slice(0, 3).join(' '));
-        }
-        if (angles.length || d.situation_summary) {
-          const top: { angle: string; detail?: string; rationale?: string; pitch_framing?: string } = angles[0];
-          updates.opportunitySummary = {
-            businessTrigger: d.situation_summary || '',
-            likelyPriorities: top ? (top.detail || top.rationale || '') : '',
-            potentialPainPoints: d.caution || d.cautions?.slice(0, 2).join(' ') || '',
-            recommendedAngle: top ? `${top.angle}: ${(top.detail || top.pitch_framing || top.rationale || '').slice(0, 150)}` : '',
-          };
-        }
-        break;
-      }
-
       case 'hubspot_contacts': {
-        const contacts: TorpedoContact[] = (entry.data || []).map((c: { name: string; email?: string; notes?: string; status?: string }) => ({
-          name: c.name, title: c.notes || c.status || '', email: c.email,
-        }));
+        const contacts = (entry.data || []) as { name: string; email?: string; notes?: string; status?: string }[];
         if (contacts.length) {
           const people: Person[] = contacts.map((c, i) => ({
             id: genId('person'), accountId, name: c.name,
-            title: c.title || '', company: companyName,
-            department: guessDepartment(c.title || ''),
+            title: c.status || '', company: companyName,
+            department: guessDepartment(c.status || ''),
             location: '', tenure: '', linkedin: '',
-            influence: guessInfluence(c.title || '') as 'High' | 'Medium' | 'Low',
+            influence: guessInfluence(c.status || '') as 'High' | 'Medium' | 'Low',
             avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
           }));
           updates.people = [...(updates.people || []), ...people];
@@ -274,7 +161,7 @@ export function importTorpedoJson(
       }
 
       case 'hubspot_deals': {
-        for (const deal of (entry.data || [])) {
+        for (const deal of (entry.data || []) as { name: string; stage: string; amount?: number; closedate?: string; notes?: string }[]) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Content Download', category: 'Content', source: 'HubSpot',
@@ -285,10 +172,56 @@ export function importTorpedoJson(
         }
         break;
       }
+
+      case 'signals': {
+        for (const s of entry.data as { signal: string; implication?: string; relevance?: string; detail?: string }[]) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Post mentioned specific keywords', category: 'Social', source: 'Research',
+            date: today, confidence: 'High', impact: 'Medium',
+            title: s.signal,
+            description: s.implication || s.relevance || s.detail || '',
+          });
+        }
+        break;
+      }
+
+      case 'contacts': {
+        const people: Person[] = (entry.data as { name: string; title: string; linkedin?: string; email?: string; location?: string }[])
+          .map((c, i) => ({
+            id: genId('person'), accountId,
+            name: c.name, title: c.title, company: companyName,
+            department: guessDepartment(c.title),
+            location: c.location || '', tenure: '',
+            linkedin: c.linkedin || '',
+            influence: guessInfluence(c.title) as 'High' | 'Medium' | 'Low',
+            avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+          }));
+        updates.people = people;
+        break;
+      }
+
+      case 'strategy': {
+        const d = entry.data;
+        if (d.situation_summary) updates.whyMatters = d.situation_summary;
+        const angles = (d.angles || []) as { angle: string; detail?: string; rationale?: string; pitch_framing?: string }[];
+        if (angles.length) {
+          updates.whyKeywords = angles.map(a => a.angle.split(' ').slice(0, 3).join(' '));
+        }
+        if (angles.length || d.situation_summary) {
+          const top = angles[0];
+          updates.opportunitySummary = {
+            businessTrigger: d.situation_summary || '',
+            likelyPriorities: top ? (top.detail || top.rationale || '') : '',
+            potentialPainPoints: d.caution || (d.cautions as string[] | undefined)?.slice(0, 2).join(' ') || '',
+            recommendedAngle: top ? `${top.angle}: ${(top.detail || top.pitch_framing || top.rationale || '').slice(0, 150)}` : '',
+          };
+        }
+        break;
+      }
     }
   }
 
-  // Score based on signal count and impact
   const highImpact = signals.filter(s => s.impact === 'High').length;
   const score = Math.min(100, Math.round(40 + highImpact * 8 + signals.length * 2));
   const scoreLabel = score >= 75 ? 'Hot' : score >= 50 ? 'Warm' : 'Cold';
@@ -297,7 +230,7 @@ export function importTorpedoJson(
     ...updates,
     signals,
     score,
-    scoreLabel,
+    scoreLabel: scoreLabel as Account['scoreLabel'],
     enrichmentStatus: 'done',
     lastUpdated: today,
   };
