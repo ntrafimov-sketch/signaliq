@@ -13,6 +13,9 @@ import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
 import { enrichAccountWithManagedAgent, isAgentConfigured } from '../services/managedAgent';
 import { enrichDirect } from '../services/directEnrich';
+import { runResearchAgent } from '../services/researchAgent';
+import { importTorpedoJson } from '../services/importTorpedo';
+import { isClaudeConfigured } from '../services/claude';
 import { calculateAccountScore } from '../services/signals';
 import type { Account } from '../types';
 import { cn } from '../lib/utils';
@@ -72,20 +75,32 @@ export function AccountsPage() {
     setEnrichingIds(prev => new Set(prev).add(account.id));
     updateAccount(account.id, { enrichmentStatus: 'enriching' });
     try {
-      const enrichFn = isAgentConfigured() ? enrichAccountWithManagedAgent : enrichDirect;
-      const result = await enrichFn(
-        { id: account.id, domain: account.domain, company_name: account.company_name, industry: account.industry },
-        (msg) => setProgressMessages(prev => ({ ...prev, [account.id]: msg })),
-      );
-      const score = calculateAccountScore(result.signals);
-      const scoreLabel = (score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold') as Account['scoreLabel'];
-      updateAccount(account.id, {
-        signals: result.signals,
-        score,
-        scoreLabel,
-        enrichmentStatus: 'done',
-        lastUpdated: 'Just now',
-      });
+      if (isClaudeConfigured()) {
+        // Research Agent: Claude with tools → torpedo JSON → import
+        setProgressMessages(prev => ({ ...prev, [account.id]: 'Starting Research Agent...' }));
+        const torpedoJson = await runResearchAgent(
+          { domain: account.domain, company_name: account.company_name, industry: account.industry },
+          (msg) => setProgressMessages(prev => ({ ...prev, [account.id]: msg })),
+        ) as Parameters<typeof importTorpedoJson>[0];
+        const updates = importTorpedoJson(torpedoJson, account.id, account.company_name);
+        updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
+      } else if (isAgentConfigured()) {
+        const result = await enrichAccountWithManagedAgent(
+          { id: account.id, domain: account.domain, company_name: account.company_name, industry: account.industry },
+          (msg) => setProgressMessages(prev => ({ ...prev, [account.id]: msg })),
+        );
+        const score = calculateAccountScore(result.signals);
+        const scoreLabel = (score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold') as Account['scoreLabel'];
+        updateAccount(account.id, { signals: result.signals, score, scoreLabel, enrichmentStatus: 'done', lastUpdated: 'Just now' });
+      } else {
+        const result = await enrichDirect(
+          { id: account.id, domain: account.domain, company_name: account.company_name, industry: account.industry },
+          (msg) => setProgressMessages(prev => ({ ...prev, [account.id]: msg })),
+        );
+        const score = calculateAccountScore(result.signals);
+        const scoreLabel = (score >= 80 ? 'Hot' : score >= 60 ? 'Warm' : 'Cold') as Account['scoreLabel'];
+        updateAccount(account.id, { signals: result.signals, score, scoreLabel, enrichmentStatus: 'done', lastUpdated: 'Just now' });
+      }
     } catch {
       updateAccount(account.id, { enrichmentStatus: 'error' });
     } finally {
