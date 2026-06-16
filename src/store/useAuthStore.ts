@@ -37,7 +37,7 @@ export const useAuthStore = create<AuthState>()(
           throw new Error('An account with this email already exists.');
         }
         const newUser: User = {
-          id: crypto.randomUUID(),
+          id: `u-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name,
           email,
           passwordHash: hashPassword(password),
