@@ -4,7 +4,10 @@ const BASE_URL = 'https://api.appmagic.rocks/v1';
 const LOGIN = import.meta.env.VITE_APPMAGIC_LOGIN;
 const PASSWORD = import.meta.env.VITE_APPMAGIC_PASSWORD;
 
-const COMPETITOR_SDKS = ['appsflyer', 'adjust', 'branch', 'kochava', 'singular', 'amplitude', 'mixpanel', 'firebase'];
+// Adapty-specific competitors: subscription/paywall SDKs + lifecycle tools
+const PAYWALL_SDKS = ['revenuecat', 'superwall', 'purchasely', 'qonversion', 'apphud'];
+const LIFECYCLE_SDKS = ['braze', 'customer.io', 'customerio', 'clevertap', 'leanplum', 'airship', 'iterable'];
+const ALL_COMPETITOR_SDKS = [...PAYWALL_SDKS, ...LIFECYCLE_SDKS];
 
 function authHeader(): string {
   return 'Basic ' + btoa(`${LOGIN}:${PASSWORD}`);
@@ -24,7 +27,7 @@ async function apiGet(path: string, params?: Record<string, string | number | un
 }
 
 // ---------------------------------------------------------------------------
-// App lookup via /v1/applications?search=...
+// App lookup
 // ---------------------------------------------------------------------------
 
 interface AppRecord {
@@ -66,20 +69,20 @@ async function findApps(companyName: string, domain: string): Promise<AppRecord[
 }
 
 // ---------------------------------------------------------------------------
-// Revenue + downloads history via /v1/history/united-application
+// Revenue + downloads history — 12 months, MoM trend
 // ---------------------------------------------------------------------------
 
 interface HistoryPoint { date: string; revenue?: number; downloads?: number; }
 
-function detectTrend(points: HistoryPoint[], field: 'revenue' | 'downloads'): { trend: 'increasing' | 'decreasing' | 'stable'; changePercent: number } {
-  const values = points.map(p => Number(p[field]) || 0).filter(v => v > 0);
-  if (values.length < 2) return { trend: 'stable', changePercent: 0 };
-  const mid = Math.floor(values.length / 2);
+function detectMoMTrend(points: HistoryPoint[], field: 'revenue' | 'downloads'): { trend: 'increasing' | 'decreasing' | 'stable'; changePercent: number } {
+  const values = points.map(p => Number(p[field]) || 0);
+  if (values.length < 4) return { trend: 'stable', changePercent: 0 };
   const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-  const first = avg(values.slice(0, mid));
-  const second = avg(values.slice(mid));
-  if (first === 0) return { trend: 'stable', changePercent: 0 };
-  const pct = Math.round(((second - first) / first) * 100);
+  // Compare last 3 months vs prior 3 months
+  const recent = avg(values.slice(-3));
+  const prior = avg(values.slice(-6, -3));
+  if (prior === 0) return { trend: 'stable', changePercent: 0 };
+  const pct = Math.round(((recent - prior) / prior) * 100);
   if (pct > 10) return { trend: 'increasing', changePercent: pct };
   if (pct < -10) return { trend: 'decreasing', changePercent: pct };
   return { trend: 'stable', changePercent: pct };
@@ -88,12 +91,12 @@ function detectTrend(points: HistoryPoint[], field: 'revenue' | 'downloads'): { 
 async function getHistory(unitedId: number, store: 1 | 2): Promise<HistoryPoint[]> {
   const today = new Date();
   const from = new Date(today);
-  from.setDate(from.getDate() - 90);
+  from.setFullYear(from.getFullYear() - 1);
   try {
     const result = await apiGet('/history/united-application', {
       united_application_id: unitedId,
       store,
-      country: 'US',
+      country: 'WW',
       date_from: from.toISOString().split('T')[0],
       date_to: today.toISOString().split('T')[0],
       aggregation: 'monthly',
@@ -105,7 +108,7 @@ async function getHistory(unitedId: number, store: 1 | 2): Promise<HistoryPoint[
 }
 
 // ---------------------------------------------------------------------------
-// Ad intelligence via /v1/adint/stats
+// Ad intelligence
 // ---------------------------------------------------------------------------
 
 async function getAdStats(iosId: string): Promise<string[]> {
@@ -115,7 +118,7 @@ async function getAdStats(iosId: string): Promise<string[]> {
   try {
     const result = await apiGet('/adint/stats', {
       appIds: iosId,
-      country: 'US',
+      country: 'WW',
       dateFrom: from.toISOString().split('T')[0],
       dateTo: today.toISOString().split('T')[0],
       aggregation: 'month',
@@ -129,14 +132,15 @@ async function getAdStats(iosId: string): Promise<string[]> {
 }
 
 // ---------------------------------------------------------------------------
-// SDK detection via /v1/sdkint/sdks
+// SDK detection
 // ---------------------------------------------------------------------------
 
-async function getAppSdks(iosId: string): Promise<string[]> {
+interface SdkItem { name: string; category?: string; }
+
+async function getAppSdks(iosId: string): Promise<SdkItem[]> {
   try {
     const result = await apiGet('/sdkint/sdks', { store: 2, store_application_id: iosId });
-    const sdks = Array.isArray(result) ? result as Array<{ name: string }> : [];
-    return sdks.map(s => s.name?.toLowerCase()).filter(Boolean);
+    return Array.isArray(result) ? result as SdkItem[] : [];
   } catch {
     return [];
   }
@@ -152,14 +156,28 @@ export async function getRevenueSignals(domain: string, companyName = ''): Promi
     const apps = await findApps(companyName || domain, domain);
     if (!apps.length) return [];
     const app = apps[0];
-    const store: 1 | 2 = app.ios_id ? 2 : 1;
-    const history = await getHistory(app.united_id, store);
-    if (!history.length) return [];
-    const { trend, changePercent } = detectTrend(history, 'revenue');
-    const abs = Math.abs(changePercent);
-    if (trend === 'increasing') return [{ type: 'Revenue Increase', category: 'Revenue', source: 'AppMagic', confidence: abs > 30 ? 'High' : 'Medium', impact: abs > 30 ? 'High' : 'Medium', title: `${app.name} revenue up ${abs}% QoQ`, description: `App revenue growing ${abs}% over the last 90 days. UA investment window is open.` }];
-    if (trend === 'decreasing') return [{ type: 'Revenue Decrease', category: 'Revenue', source: 'AppMagic', confidence: 'Medium', impact: 'Medium', title: `${app.name} revenue down ${abs}%`, description: `Revenue dropped ${abs}% — potential pain point driving MMP re-evaluation.` }];
-    return [{ type: 'Revenue Plateau', category: 'Revenue', source: 'AppMagic', confidence: 'Medium', impact: 'Low', title: `${app.name} revenue plateaued`, description: `Revenue flat at ±${abs}% — rising CAC may push them to evaluate new UA channels.` }];
+    const signals: Partial<Signal>[] = [];
+
+    const stores: Array<{ store: 1 | 2; label: string; hasId: boolean }> = [
+      { store: 2, label: 'iOS', hasId: !!app.ios_id },
+      { store: 1, label: 'Android', hasId: !!app.android_id },
+    ];
+
+    for (const { store, label, hasId } of stores) {
+      if (!hasId && store === 1 && !app.android_id) continue;
+      if (!hasId && store === 2 && !app.ios_id) continue;
+      const history = await getHistory(app.united_id, store);
+      if (!history.length) continue;
+      const { trend, changePercent } = detectMoMTrend(history, 'revenue');
+      const abs = Math.abs(changePercent);
+      if (trend === 'increasing')
+        signals.push({ type: 'Revenue Increase', category: 'Revenue', source: 'AppMagic', confidence: abs > 30 ? 'High' : 'Medium', impact: abs > 30 ? 'High' : 'Medium', title: `${app.name} ${label} revenue +${abs}% MoM`, description: `${label} revenue grew ${abs}% (last 3 months vs prior 3 months). Active UA scaling window.` });
+      else if (trend === 'decreasing')
+        signals.push({ type: 'Revenue Decrease', category: 'Revenue', source: 'AppMagic', confidence: 'Medium', impact: 'Medium', title: `${app.name} ${label} revenue −${abs}% MoM`, description: `${label} revenue dropped ${abs}% — potential pain point driving monetization re-evaluation.` });
+      else
+        signals.push({ type: 'Revenue Plateau', category: 'Revenue', source: 'AppMagic', confidence: 'Medium', impact: 'Low', title: `${app.name} ${label} revenue plateau (±${abs}%)`, description: `${label} revenue flat over last 6 months — rising CAC may push new channel evaluation.` });
+    }
+    return signals;
   } catch {
     return getMockRevenueSignals(domain);
   }
@@ -171,14 +189,28 @@ export async function getDownloadSignals(domain: string, companyName = ''): Prom
     const apps = await findApps(companyName || domain, domain);
     if (!apps.length) return [];
     const app = apps[0];
-    const store: 1 | 2 = app.ios_id ? 2 : 1;
-    const history = await getHistory(app.united_id, store);
-    if (!history.length) return [];
-    const { trend, changePercent } = detectTrend(history, 'downloads');
-    const abs = Math.abs(changePercent);
-    if (trend === 'increasing') return [{ type: 'Download Increase', category: 'Downloads', source: 'AppMagic', confidence: abs > 25 ? 'High' : 'Medium', impact: abs > 25 ? 'High' : 'Medium', title: `${app.name} installs up ${abs}% MoM`, description: `Downloads grew ${abs}% in the last 90 days — active UA scaling underway.` }];
-    if (trend === 'decreasing') return [{ type: 'Download Decrease', category: 'Downloads', source: 'AppMagic', confidence: 'Medium', impact: 'Medium', title: `${app.name} installs down ${abs}%`, description: `Download volume fell ${abs}% — may be facing channel saturation.` }];
-    return [{ type: 'Download Plateau', category: 'Downloads', source: 'AppMagic', confidence: 'Medium', impact: 'Low', title: `${app.name} install growth flat`, description: `Downloads plateaued at ±${abs}% — organic ceiling may be driving paid UA interest.` }];
+    const signals: Partial<Signal>[] = [];
+
+    const stores: Array<{ store: 1 | 2; label: string; hasId: boolean }> = [
+      { store: 2, label: 'iOS', hasId: !!app.ios_id },
+      { store: 1, label: 'Android', hasId: !!app.android_id },
+    ];
+
+    for (const { store, label, hasId } of stores) {
+      if (!hasId && store === 1 && !app.android_id) continue;
+      if (!hasId && store === 2 && !app.ios_id) continue;
+      const history = await getHistory(app.united_id, store);
+      if (!history.length) continue;
+      const { trend, changePercent } = detectMoMTrend(history, 'downloads');
+      const abs = Math.abs(changePercent);
+      if (trend === 'increasing')
+        signals.push({ type: 'Download Increase', category: 'Downloads', source: 'AppMagic', confidence: abs > 25 ? 'High' : 'Medium', impact: abs > 25 ? 'High' : 'Medium', title: `${app.name} ${label} installs +${abs}% MoM`, description: `${label} downloads grew ${abs}% (last 3 months vs prior 3 months).` });
+      else if (trend === 'decreasing')
+        signals.push({ type: 'Download Decrease', category: 'Downloads', source: 'AppMagic', confidence: 'Medium', impact: 'Medium', title: `${app.name} ${label} installs −${abs}% MoM`, description: `${label} downloads fell ${abs}% — channel saturation or seasonality.` });
+      else
+        signals.push({ type: 'Download Plateau', category: 'Downloads', source: 'AppMagic', confidence: 'Medium', impact: 'Low', title: `${app.name} ${label} install growth flat (±${abs}%)`, description: `${label} downloads plateaued — organic ceiling may be driving paid UA interest.` });
+    }
+    return signals;
   } catch {
     return getMockDownloadSignals(domain);
   }
@@ -193,12 +225,20 @@ export async function getAdChannelSignals(domain: string, companyName = ''): Pro
     if (!app.ios_id) return [];
     const networks = await getAdStats(app.ios_id);
     const signals: Partial<Signal>[] = [];
-    if (networks.some(n => n.includes('facebook') || n.includes('meta') || n.includes('tiktok')))
-      signals.push({ type: 'Using Meta/TT', category: 'Ad Spend', source: 'AppMagic', confidence: 'High', impact: 'High', title: `${app.name} running Meta/TikTok UA`, description: `Active ad creatives on Meta/TikTok: ${networks.join(', ')}.` });
-    if (networks.some(n => n.includes('apple') || n.includes('asa') || n.includes('search')))
-      signals.push({ type: 'Using ASA', category: 'Ad Spend', source: 'AppMagic', confidence: 'High', impact: 'High', title: `${app.name} running Apple Search Ads`, description: `ASA campaigns detected for ${app.name}.` });
-    if (networks.some(n => n.includes('web') || n.includes('w2a')))
-      signals.push({ type: 'Using W2A', category: 'Ad Spend', source: 'AppMagic', confidence: 'High', impact: 'Medium', title: `${app.name} using web-to-app funnel`, description: `Web-to-app campaigns detected.` });
+
+    const hasMeta = networks.some(n => n.includes('facebook') || n.includes('meta'));
+    const hasTT = networks.some(n => n.includes('tiktok'));
+    const hasASA = networks.some(n => n.includes('apple') || n.includes('asa') || n.includes('search ads') || n.includes('searchads'));
+    const hasW2A = networks.some(n => n.includes('web') || n.includes('w2a'));
+
+    if (hasMeta || hasTT) {
+      const channels = [hasMeta && 'Meta', hasTT && 'TikTok'].filter(Boolean).join(' + ');
+      signals.push({ type: 'Using Meta/TT', category: 'Ad Spend', source: 'AppMagic', confidence: 'High', impact: 'High', title: `${app.name} running ${channels} UA`, description: `Active ad creatives detected on ${channels}. Networks found: ${networks.slice(0, 5).join(', ')}.` });
+    }
+    if (hasASA)
+      signals.push({ type: 'Using ASA', category: 'Ad Spend', source: 'AppMagic', confidence: 'High', impact: 'High', title: `${app.name} running Apple Search Ads`, description: `ASA campaigns active — keyword bidding on iOS App Store.` });
+    if (hasW2A)
+      signals.push({ type: 'Using W2A', category: 'Ad Spend', source: 'AppMagic', confidence: 'High', impact: 'Medium', title: `${app.name} using web-to-app funnel`, description: `Web-to-app campaigns detected — complex attribution setup.` });
     return signals;
   } catch {
     return getMockAdChannelSignals(domain);
@@ -213,9 +253,20 @@ export async function getCompetitorUsageSignals(domain: string, companyName = ''
     const app = apps[0];
     if (!app.ios_id) return [];
     const sdks = await getAppSdks(app.ios_id);
-    const found = sdks.filter(s => COMPETITOR_SDKS.some(c => s.includes(c)));
-    if (!found.length) return [];
-    return [{ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', confidence: 'High', impact: 'High', title: `${found.slice(0, 2).join(' + ')} detected in ${app.name}`, description: `SDK scan confirmed: ${found.join(', ')}. Competitive displacement opportunity.` }];
+    const sdkNames = sdks.map(s => s.name?.toLowerCase()).filter(Boolean);
+
+    const foundPaywall = sdkNames.filter(s => PAYWALL_SDKS.some(c => s.includes(c)));
+    const foundLifecycle = sdkNames.filter(s => LIFECYCLE_SDKS.some(c => s.includes(c)));
+    const allFound = [...new Set([...foundPaywall, ...foundLifecycle])];
+
+    if (!allFound.length) return [];
+
+    const signals: Partial<Signal>[] = [];
+    if (foundPaywall.length)
+      signals.push({ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', confidence: 'High', impact: 'High', title: `Paywall SDK: ${foundPaywall.slice(0, 2).join(', ')} in ${app.name}`, description: `Detected competitor paywall/subscription SDKs: ${foundPaywall.join(', ')}. Direct displacement opportunity.` });
+    if (foundLifecycle.length)
+      signals.push({ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', confidence: 'High', impact: 'Medium', title: `Lifecycle tool: ${foundLifecycle.slice(0, 2).join(', ')} in ${app.name}`, description: `Lifecycle/CRM SDKs detected: ${foundLifecycle.join(', ')}.` });
+    return signals;
   } catch {
     return getMockCompetitorUsageSignals(domain);
   }
@@ -225,22 +276,28 @@ export async function getCompetitorUsageSignals(domain: string, companyName = ''
 
 function getMockRevenueSignals(domain: string): Partial<Signal>[] {
   const map: Record<string, Partial<Signal>[]> = {
-    'uber.com': [{ type: 'Revenue Increase', category: 'Revenue', source: 'AppMagic', title: 'Mobile app revenue increased 42%', description: 'Quarter-over-quarter growth in iOS and Android in-app revenue.', confidence: 'High', impact: 'High' }],
-    'revolut.com': [{ type: 'Revenue Increase', category: 'Revenue', source: 'AppMagic', title: 'Revenue +28% in European markets', description: 'Strong premium subscription revenue growth across EU markets.', confidence: 'High', impact: 'High' }],
-    'wise.com': [{ type: 'Revenue Plateau', category: 'Revenue', source: 'AppMagic', title: 'Revenue growth plateaued at 3% QoQ', description: 'Wise app revenue growth has stabilized; CAC rising.', confidence: 'Medium', impact: 'Medium' }],
-    'bolt.eu': [{ type: 'Revenue Increase', category: 'Revenue', source: 'AppMagic', title: 'Bolt app revenue up 31% YoY', description: 'Strong ride-hailing and food delivery revenue growth.', confidence: 'High', impact: 'High' }],
-    'spotify.com': [{ type: 'Revenue Decrease', category: 'Revenue', source: 'AppMagic', title: 'Premium subscriber growth slowing', description: 'New subscriber growth decelerated with rising acquisition costs.', confidence: 'Medium', impact: 'Low' }],
+    'uber.com': [
+      { type: 'Revenue Increase', category: 'Revenue', source: 'AppMagic', title: 'iOS revenue +42% MoM', description: 'iOS revenue grew 42% (last 3 months vs prior 3).', confidence: 'High', impact: 'High' },
+      { type: 'Revenue Increase', category: 'Revenue', source: 'AppMagic', title: 'Android revenue +31% MoM', description: 'Android revenue grew 31% over the same period.', confidence: 'High', impact: 'High' },
+    ],
+    'revolut.com': [
+      { type: 'Revenue Increase', category: 'Revenue', source: 'AppMagic', title: 'iOS revenue +28% MoM', description: 'Strong premium subscription revenue growth on iOS.', confidence: 'High', impact: 'High' },
+    ],
+    'wise.com': [{ type: 'Revenue Plateau', category: 'Revenue', source: 'AppMagic', title: 'iOS revenue plateau ±3%', description: 'Wise app revenue stabilized; CAC rising.', confidence: 'Medium', impact: 'Medium' }],
+    'spotify.com': [{ type: 'Revenue Decrease', category: 'Revenue', source: 'AppMagic', title: 'iOS revenue −12% MoM', description: 'New subscriber growth decelerated with rising acquisition costs.', confidence: 'Medium', impact: 'Medium' }],
   };
   return map[domain] || [];
 }
 
 function getMockDownloadSignals(domain: string): Partial<Signal>[] {
   const map: Record<string, Partial<Signal>[]> = {
-    'uber.com': [{ type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'App installs up 28% MoM', description: 'Uber app downloads surged 28% month-over-month.', confidence: 'High', impact: 'High' }],
-    'revolut.com': [{ type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'Downloads up 22% in EU markets', description: 'Revolut seeing strong install growth across Germany, France, and Poland.', confidence: 'High', impact: 'High' }],
-    'bolt.eu': [{ type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'Bolt installs +35% in Africa', description: 'Strong download growth in Nigeria, Kenya, and South Africa.', confidence: 'High', impact: 'High' }],
-    'wise.com': [{ type: 'Download Plateau', category: 'Downloads', source: 'AppMagic', title: 'Download growth flattening at 2% MoM', description: 'Wise app install growth has stabilized in core markets.', confidence: 'Medium', impact: 'Medium' }],
-    'klarna.com': [{ type: 'Download Decrease', category: 'Downloads', source: 'AppMagic', title: 'Installs down 12% in US market', description: 'Klarna app downloads declined following BNPL regulatory scrutiny.', confidence: 'Medium', impact: 'Medium' }],
+    'uber.com': [
+      { type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'iOS installs +28% MoM', description: 'iOS downloads surged 28% month-over-month.', confidence: 'High', impact: 'High' },
+      { type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'Android installs +19% MoM', description: 'Android install growth strong in LATAM.', confidence: 'High', impact: 'Medium' },
+    ],
+    'revolut.com': [{ type: 'Download Increase', category: 'Downloads', source: 'AppMagic', title: 'iOS installs +22% MoM', description: 'Strong install growth across EU markets.', confidence: 'High', impact: 'High' }],
+    'wise.com': [{ type: 'Download Plateau', category: 'Downloads', source: 'AppMagic', title: 'iOS install growth flat ±2%', description: 'Wise install growth stabilized in core markets.', confidence: 'Medium', impact: 'Medium' }],
+    'klarna.com': [{ type: 'Download Decrease', category: 'Downloads', source: 'AppMagic', title: 'iOS installs −12% MoM', description: 'Downloads declined following regulatory scrutiny.', confidence: 'Medium', impact: 'Medium' }],
   };
   return map[domain] || [];
 }
@@ -248,11 +305,11 @@ function getMockDownloadSignals(domain: string): Partial<Signal>[] {
 function getMockAdChannelSignals(domain: string): Partial<Signal>[] {
   const map: Record<string, Partial<Signal>[]> = {
     'uber.com': [
-      { type: 'Using ASA', category: 'Ad Spend', source: 'AppMagic', title: 'Apple Search Ads activated in 7 new markets', description: 'ASA keyword footprint expanded into LATAM and SEA storefronts.', confidence: 'High', impact: 'High' },
-      { type: 'Using Meta/TT', category: 'Ad Spend', source: 'AppMagic', title: 'Scaling Meta + TikTok UA spend in LATAM', description: 'Estimated +$1.2M/mo creative volume across Meta and TikTok.', confidence: 'High', impact: 'Medium' },
+      { type: 'Using ASA', category: 'Ad Spend', source: 'AppMagic', title: 'Apple Search Ads active in 7 markets', description: 'ASA keyword footprint expanded into LATAM and SEA storefronts.', confidence: 'High', impact: 'High' },
+      { type: 'Using Meta/TT', category: 'Ad Spend', source: 'AppMagic', title: 'Scaling Meta + TikTok UA', description: 'Active creatives on Meta and TikTok.', confidence: 'High', impact: 'Medium' },
     ],
     'revolut.com': [
-      { type: 'Using ASA', category: 'Ad Spend', source: 'AppMagic', title: 'ASA campaigns running in UK & EU', description: 'Active Apple Search Ads campaigns targeting fintech keywords.', confidence: 'High', impact: 'High' },
+      { type: 'Using ASA', category: 'Ad Spend', source: 'AppMagic', title: 'ASA campaigns running in UK & EU', description: 'Active Apple Search Ads targeting fintech keywords.', confidence: 'High', impact: 'High' },
     ],
   };
   return map[domain] || [];
@@ -260,9 +317,9 @@ function getMockAdChannelSignals(domain: string): Partial<Signal>[] {
 
 function getMockCompetitorUsageSignals(domain: string): Partial<Signal>[] {
   const map: Record<string, Partial<Signal>[]> = {
-    'uber.com': [{ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', title: 'AppsFlyer + Amplitude detected', description: 'SDK scan confirms AppsFlyer for attribution and Amplitude for analytics.', confidence: 'High', impact: 'High' }],
-    'revolut.com': [{ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', title: 'Adjust SDK detected', description: 'Revolut using Adjust as primary MMP — competitive displacement opportunity.', confidence: 'High', impact: 'High' }],
-    'bolt.eu': [{ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', title: 'Branch SDK active in Bolt app', description: 'Branch used for deep linking and attribution.', confidence: 'Medium', impact: 'Medium' }],
+    'uber.com': [{ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', title: 'RevenueCat detected in app', description: 'RevenueCat SDK confirmed — direct displacement opportunity.', confidence: 'High', impact: 'High' }],
+    'revolut.com': [{ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', title: 'Braze + Qonversion detected', description: 'Lifecycle (Braze) and paywall (Qonversion) SDKs found.', confidence: 'High', impact: 'High' }],
+    'bolt.eu': [{ type: 'Using Competitors', category: 'Competitive', source: 'AppMagic', title: 'Apphud SDK active', description: 'Apphud used for subscription management.', confidence: 'Medium', impact: 'Medium' }],
   };
   return map[domain] || [];
 }

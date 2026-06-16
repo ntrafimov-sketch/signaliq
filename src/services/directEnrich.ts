@@ -2,7 +2,7 @@ import type { Signal } from '../types';
 import { getHiringSignals, getSocialSignals } from './amplemarket';
 import { getWebsiteVisitSignals, getCompetitorResearchSignals } from './demandbase';
 import { getRevenueSignals, getDownloadSignals, getAdChannelSignals, getCompetitorUsageSignals } from './appmagic';
-import { getContentDownloadSignals, getWebinarSignals } from './hubspot';
+import { getContentDownloadSignals, getWebinarSignals, getHubSpotHistorySignals } from './hubspot';
 
 export interface AgentEnrichmentResult {
   signals: Signal[];
@@ -33,6 +33,7 @@ export async function enrichDirect(
     { name: 'Competitor research (Demandbase)', fn: () => getCompetitorResearchSignals(account.domain) },
     { name: 'Content downloads (HubSpot)', fn: () => getContentDownloadSignals(account.domain) },
     { name: 'Webinars (HubSpot)', fn: () => getWebinarSignals(account.domain) },
+    { name: 'CRM history (HubSpot)', fn: () => getHubSpotHistorySignals(account.domain) },
   ];
 
   for (const connector of connectors) {
@@ -56,7 +57,7 @@ export async function enrichDirect(
 
   return {
     signals: allSignals,
-    reasoning: `Enriched ${account.company_name} with ${allSignals.length} signals from 10 connectors.`,
+    reasoning: `Enriched ${account.company_name} with ${allSignals.length} signals from 11 connectors.`,
     duration: (Date.now() - startTime) / 1000,
   };
 }

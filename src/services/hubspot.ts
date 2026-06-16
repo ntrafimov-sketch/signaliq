@@ -113,6 +113,48 @@ export async function syncAccountToCRM(accountData: { name: string; domain: stri
   }
 }
 
+export async function getHubSpotHistorySignals(domain: string): Promise<Partial<Signal>[]> {
+  if (!API_KEY) return getMockHubSpotHistorySignals(domain);
+  try {
+    const [company, contacts] = await Promise.all([
+      getCompanyByDomain(domain),
+      getContactsByDomain(domain),
+    ]);
+    if (!company && !contacts.length) return [];
+
+    const signals: Partial<Signal>[] = [];
+    const lifecycleStage = company?.properties?.lifecyclestage ?? contacts[0]?.properties?.lifecyclestage;
+
+    if (lifecycleStage) {
+      const stageMap: Record<string, string> = {
+        lead: 'Lead', marketingqualifiedlead: 'MQL', salesqualifiedlead: 'SQL',
+        opportunity: 'Opportunity', customer: 'Customer', evangelist: 'Evangelist',
+      };
+      const label = stageMap[lifecycleStage] ?? lifecycleStage;
+      signals.push({
+        type: 'Webinar Visited', category: 'Content', source: 'HubSpot',
+        confidence: 'High', impact: 'High',
+        title: `HubSpot lifecycle: ${label}`,
+        description: `${domain} is currently at stage "${label}" in HubSpot CRM.`,
+      });
+    }
+
+    if (contacts.length > 0) {
+      const names = contacts.slice(0, 3).map(c => `${c.properties.firstname ?? ''} ${c.properties.lastname ?? ''}`.trim()).filter(Boolean);
+      signals.push({
+        type: 'Content Download', category: 'Content', source: 'HubSpot',
+        confidence: 'High', impact: 'Medium',
+        title: `${contacts.length} contact${contacts.length > 1 ? 's' : ''} in HubSpot`,
+        description: `Known contacts: ${names.join(', ')}. Previous communication history exists.`,
+      });
+    }
+
+    return signals;
+  } catch {
+    return [];
+  }
+}
+
 export async function testConnection(): Promise<boolean> {
   if (!API_KEY) return false;
   try {
@@ -135,6 +177,19 @@ function getMockContentDownloadSignals(domain: string): Partial<Signal>[] {
     ],
     'klarna.com': [
       { type: 'Content Download', category: 'Content', source: 'HubSpot', title: 'Downloaded BNPL attribution guide', description: 'Klarna team downloaded our guide on measuring paid UA for BNPL products.', confidence: 'Medium', impact: 'Medium' },
+    ],
+  };
+  return map[domain] || [];
+}
+
+function getMockHubSpotHistorySignals(domain: string): Partial<Signal>[] {
+  const map: Record<string, Partial<Signal>[]> = {
+    'uber.com': [
+      { type: 'Content Download', category: 'Content', source: 'HubSpot', confidence: 'High', impact: 'High', title: 'HubSpot lifecycle: SQL', description: 'Uber is marked as Sales Qualified Lead. Active deal in pipeline.' },
+      { type: 'Webinar Visited', category: 'Content', source: 'HubSpot', confidence: 'High', impact: 'Medium', title: '3 contacts in HubSpot', description: 'Known contacts: John Smith, Sarah Lee, Mike Chen. Email thread from Q1 2025.' },
+    ],
+    'revolut.com': [
+      { type: 'Content Download', category: 'Content', source: 'HubSpot', confidence: 'Medium', impact: 'Medium', title: 'HubSpot lifecycle: MQL', description: 'Revolut contacted us in Jan 2025 — no active deal.' },
     ],
   };
   return map[domain] || [];
