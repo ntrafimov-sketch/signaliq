@@ -46,9 +46,27 @@ app.post('/api/enrich', (req, res) => {
     return;
   }
 
-  const { account_id, company_name, data } = req.body;
-  if (!account_id || !data) {
-    res.status(400).json({ error: 'account_id and data are required' });
+  const body = req.body;
+
+  // Accept either {account_id, company_name, data} or raw array from Clay
+  let account_id: string;
+  let company_name: string;
+  let data: unknown[];
+
+  if (Array.isArray(body)) {
+    // Clay sends raw array — extract company info from company_intel entry
+    data = body;
+    const intel = body.find((e: { type?: string }) => e.type === 'company_intel') as { data?: { domain?: string; name?: string } } | undefined;
+    account_id = intel?.data?.domain || `account-${Date.now()}`;
+    company_name = intel?.data?.name || 'Unknown';
+  } else {
+    data = body.data;
+    account_id = body.account_id;
+    company_name = body.company_name;
+  }
+
+  if (!data) {
+    res.status(400).json({ error: 'data is required' });
     return;
   }
 
