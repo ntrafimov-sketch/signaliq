@@ -61,7 +61,7 @@ function ScoreBadge({ score, tier }: { score: number; tier: Account['scoreLabel'
 }
 
 export function AccountsPage() {
-  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount } = useStore();
+  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts } = useStore();
   const [search, setSearch] = useState('');
   const [scoreFilter, setScoreFilter] = useState('all');
   const [industryFilter, setIndustryFilter] = useState('all');
@@ -73,12 +73,36 @@ export function AccountsPage() {
   useEffect(() => {
     const disconnect = connectWebhookListener((accountId, companyName, torpedoData) => {
       const normalizeDomain = (d: string) => d.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
-      const account = accounts.find(a =>
+      let account = accounts.find(a =>
         a.id === accountId ||
         normalizeDomain(a.domain) === normalizeDomain(accountId) ||
         a.company_name.toLowerCase().trim() === companyName.toLowerCase().trim()
       );
-      if (!account) return;
+      if (!account) {
+        // Auto-create account from torpedo data
+        const newId = `webhook-${Date.now()}`;
+        const newAccount: Account = {
+          id: newId,
+          company_name: companyName,
+          domain: accountId,
+          industry: 'Unknown',
+          employees: 0,
+          country: '',
+          score: 0,
+          scoreLabel: 'Cold',
+          signals: [],
+          enrichmentStatus: 'pending',
+          lastUpdated: 'Just now',
+          description: '',
+          founded: '',
+          hq: '',
+          revenue: '',
+          status: 'Private',
+          logoColor: '#6366f1',
+        };
+        addAccounts([newAccount]);
+        account = newAccount;
+      }
       const updates = importTorpedoJson(torpedoData as Parameters<typeof importTorpedoJson>[0], account.id, account.company_name);
       updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
     });
