@@ -334,3 +334,13 @@ export interface AppMagicAppData {
 }
 
 export async function getAppDataByPublisher(_domain: string): Promise<AppMagicAppData[]> { return []; }
+
+export async function testConnection(): Promise<boolean> {
+  if (!hasCredentials()) return false;
+  try {
+    await apiGet('/applications', { search: 'spotify', limit: 1 });
+    return true;
+  } catch {
+    return false;
+  }
+}
