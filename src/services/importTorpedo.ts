@@ -177,8 +177,8 @@ export function importTorpedoJson(
         }
         if (d.contacts_mapped?.length) {
           const recent = d.contacts_mapped
-            .filter(c => c.last_contacted || c.last_email_sent)
-            .sort((a, b) => {
+            .filter((c: { last_contacted?: string; last_email_sent?: string }) => c.last_contacted || c.last_email_sent)
+            .sort((a: { last_contacted?: string; last_email_sent?: string }, b: { last_contacted?: string; last_email_sent?: string }) => {
               const dateA = a.last_contacted || a.last_email_sent || '';
               const dateB = b.last_contacted || b.last_email_sent || '';
               return dateB.localeCompare(dateA);
@@ -191,7 +191,7 @@ export function importTorpedoJson(
               date: recent[0].last_contacted || recent[0].last_email_sent || today,
               confidence: 'High', impact: 'Medium',
               title: `${d.contacts_mapped.length} contacts in HubSpot CRM`,
-              description: `Recently contacted: ${recent.map(c => `${c.name} (${c.title})`).join(', ')}.`,
+              description: `Recently contacted: ${recent.map((c: { name: string; title: string }) => `${c.name} (${c.title})`).join(', ')}.`,
             });
           }
         }
@@ -212,7 +212,7 @@ export function importTorpedoJson(
       }
 
       case 'contacts': {
-        const people: Person[] = entry.data.map((c, i) => ({
+        const people: Person[] = entry.data.map((c: TorpedoContact, i: number) => ({
           id: genId('person'),
           accountId,
           name: c.name,
@@ -234,10 +234,10 @@ export function importTorpedoJson(
         if (d.situation_summary) updates.whyMatters = d.situation_summary;
         const angles = d.angles || [];
         if (angles.length) {
-          updates.whyKeywords = angles.map((a: { angle: string }) => a.angle.split(' ').slice(0, 3).join(' '));
+          updates.whyKeywords = angles.map((a: { angle: string; detail?: string; rationale?: string; pitch_framing?: string }) => a.angle.split(' ').slice(0, 3).join(' '));
         }
         if (angles.length || d.situation_summary) {
-          const top = angles[0];
+          const top: { angle: string; detail?: string; rationale?: string; pitch_framing?: string } = angles[0];
           updates.opportunitySummary = {
             businessTrigger: d.situation_summary || '',
             likelyPriorities: top ? (top.detail || top.rationale || '') : '',
