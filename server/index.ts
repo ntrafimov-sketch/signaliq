@@ -2,10 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const distDir = join(__dirname, '../dist');
 
 const API_KEY = process.env.WEBHOOK_API_KEY || 'signaliq-dev-key';
 const PORT = process.env.PORT || 3001;
@@ -51,6 +56,12 @@ app.post('/api/enrich', (req, res) => {
   broadcast('enrich', { account_id, company_name, data });
 
   res.json({ ok: true, pushed_to: clients.size });
+});
+
+// Serve React frontend
+app.use(express.static(distDir));
+app.get('*', (_req, res) => {
+  res.sendFile(join(distDir, 'index.html'));
 });
 
 server.listen(PORT, () => {
