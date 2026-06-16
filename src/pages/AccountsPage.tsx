@@ -72,7 +72,12 @@ export function AccountsPage() {
   // Listen for Clay webhook enrichments
   useEffect(() => {
     const disconnect = connectWebhookListener((accountId, companyName, torpedoData) => {
-      const account = accounts.find(a => a.id === accountId || a.domain === accountId || a.company_name === companyName);
+      const normalizeDomain = (d: string) => d.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+      const account = accounts.find(a =>
+        a.id === accountId ||
+        normalizeDomain(a.domain) === normalizeDomain(accountId) ||
+        a.company_name.toLowerCase().trim() === companyName.toLowerCase().trim()
+      );
       if (!account) return;
       const updates = importTorpedoJson(torpedoData as Parameters<typeof importTorpedoJson>[0], account.id, account.company_name);
       updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
