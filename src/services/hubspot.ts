@@ -27,6 +27,7 @@ export interface HubSpotCompany {
     annualrevenue: string;
     city: string;
     country: string;
+    lifecyclestage?: string;
   };
 }
 

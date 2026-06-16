@@ -65,7 +65,7 @@ export async function enrichAccountWithManagedAgent(
   const userText = `Enrich buying signals for: ${account.company_name} (domain: ${account.domain}, industry: ${account.industry || 'Unknown'}). Call all 10 connector tools now.`;
 
   // Open stream and send message concurrently so no events are missed
-  const stream = client.beta.sessions.events.stream(session.id);
+  const stream = await client.beta.sessions.events.stream(session.id);
 
   client.beta.sessions.events.send(session.id, {
     events: [{ type: 'user.message', content: [{ type: 'text', text: userText }] }],

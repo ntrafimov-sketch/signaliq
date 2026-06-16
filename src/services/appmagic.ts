@@ -7,7 +7,6 @@ const PASSWORD = import.meta.env.VITE_APPMAGIC_PASSWORD;
 // Adapty-specific competitors: subscription/paywall SDKs + lifecycle tools
 const PAYWALL_SDKS = ['revenuecat', 'superwall', 'purchasely', 'qonversion', 'apphud'];
 const LIFECYCLE_SDKS = ['braze', 'customer.io', 'customerio', 'clevertap', 'leanplum', 'airship', 'iterable'];
-const ALL_COMPETITOR_SDKS = [...PAYWALL_SDKS, ...LIFECYCLE_SDKS];
 
 function authHeader(): string {
   return 'Basic ' + btoa(`${LOGIN}:${PASSWORD}`);
