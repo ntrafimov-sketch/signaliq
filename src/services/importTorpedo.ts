@@ -55,14 +55,8 @@ interface TorpedoStrategy {
   cautions?: string[];
 }
 
-type TorpedoEntry =
-  | { type: 'company_intel'; data: TorpedoCompanyIntel }
-  | { type: 'revenue_history'; data: TorpedoRevenuePoint[]; store?: string; notes?: string }
-  | { type: 'sdks'; data: TorpedoSdk[] }
-  | { type: 'crm_history'; data: TorpedoCrmHistory }
-  | { type: 'signals'; data: TorpedoSignal[] }
-  | { type: 'contacts'; data: TorpedoContact[] }
-  | { type: 'strategy'; data: TorpedoStrategy };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TorpedoEntry = { type: string; data: any; notes?: string; store?: string; summary?: any };
 
 function genId(prefix = 'sig') {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -83,32 +77,22 @@ export function importTorpedoJson(
     switch (entry.type) {
       case 'company_intel': {
         const d = entry.data;
-        updates.description = d.business_model || d.name;
+        updates.description = d.description || d.business_model || d.name;
         updates.hq = d.hq || '';
-        updates.employees = d.headcount || 0;
+        updates.employees = typeof d.headcount === 'number' ? d.headcount
+          : parseInt(String(d.headcount || '0').replace(/\D.*/, '')) || 0;
         updates.industry = d.industry || '';
-        updates.revenue = d.total_funding_usd
-          ? `$${(d.total_funding_usd / 1_000_000).toFixed(0)}M raised`
-          : '';
-        updates.status = d.stage || 'Private';
-        updates.founded = d.latest_round?.date?.slice(0, 4) || '';
-        if (d.highlights?.length) {
-          signals.push({
-            id: genId(), accountId, accountName: companyName,
-            type: 'Post from market leaders', category: 'Social', source: 'Research',
-            date: today, confidence: 'High', impact: 'High',
-            title: `${d.name}: ${d.stage || 'growth stage'}`,
-            description: d.highlights.slice(0, 3).join(' · '),
-          });
-        }
-        if (d.latest_round) {
-          const r = d.latest_round;
+        updates.revenue = d.funding || (d.total_funding_usd
+          ? `$${(d.total_funding_usd / 1_000_000).toFixed(0)}M raised` : '');
+        updates.status = d.stage || d.amplemarket_account_status?.includes('customer') ? 'Customer' : 'Private';
+        updates.founded = d.founded ? String(d.founded) : (d.latest_round?.date?.slice(0, 4) || '');
+        if (d.funding || d.latest_round) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Revenue Increase', category: 'Revenue', source: 'Research',
-            date: r.date || today, confidence: 'High', impact: 'High',
-            title: `${r.type} — $${(r.amount_usd / 1_000_000).toFixed(0)}M raised`,
-            description: `Investors: ${r.investors?.slice(0, 3).join(', ')}. Fresh capital = growth mandate.`,
+            date: today, confidence: 'High', impact: 'High',
+            title: `Funding: ${d.funding || `$${(d.latest_round.amount_usd / 1_000_000).toFixed(0)}M`}`,
+            description: d.description || '',
           });
         }
         break;
@@ -221,7 +205,7 @@ export function importTorpedoJson(
             type: 'Post mentioned specific keywords', category: 'Social', source: 'Research',
             date: today, confidence: 'High', impact: 'Medium',
             title: s.signal,
-            description: s.implication,
+            description: s.implication || s.relevance || s.detail || '',
           });
         }
         break;
@@ -248,17 +232,56 @@ export function importTorpedoJson(
       case 'strategy': {
         const d = entry.data;
         if (d.situation_summary) updates.whyMatters = d.situation_summary;
-        if (d.angles?.length) {
-          updates.whyKeywords = d.angles.map(a => a.angle.split(' ').slice(0, 3).join(' '));
+        const angles = d.angles || [];
+        if (angles.length) {
+          updates.whyKeywords = angles.map((a: { angle: string }) => a.angle.split(' ').slice(0, 3).join(' '));
         }
-        if (d.angles?.length || d.situation_summary) {
-          const top = d.angles?.[0];
+        if (angles.length || d.situation_summary) {
+          const top = angles[0];
           updates.opportunitySummary = {
             businessTrigger: d.situation_summary || '',
-            likelyPriorities: top ? top.rationale : '',
-            potentialPainPoints: d.cautions?.slice(0, 2).join(' ') || '',
-            recommendedAngle: top ? `${top.angle}: ${top.rationale.slice(0, 150)}` : '',
+            likelyPriorities: top ? (top.detail || top.rationale || '') : '',
+            potentialPainPoints: d.caution || d.cautions?.slice(0, 2).join(' ') || '',
+            recommendedAngle: top ? `${top.angle}: ${(top.detail || top.pitch_framing || top.rationale || '').slice(0, 150)}` : '',
           };
+        }
+        break;
+      }
+
+      case 'hubspot_contacts': {
+        const contacts: TorpedoContact[] = (entry.data || []).map((c: { name: string; email?: string; notes?: string; status?: string }) => ({
+          name: c.name, title: c.notes || c.status || '', email: c.email,
+        }));
+        if (contacts.length) {
+          const people: Person[] = contacts.map((c, i) => ({
+            id: genId('person'), accountId, name: c.name,
+            title: c.title || '', company: companyName,
+            department: guessDepartment(c.title || ''),
+            location: '', tenure: '', linkedin: '',
+            influence: guessInfluence(c.title || '') as 'High' | 'Medium' | 'Low',
+            avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+          }));
+          updates.people = [...(updates.people || []), ...people];
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Webinar Visited', category: 'Content', source: 'HubSpot',
+            date: today, confidence: 'High', impact: 'Medium',
+            title: `${contacts.length} contacts in HubSpot`,
+            description: entry.summary?.highest_engagement || `${contacts.length} tracked contacts`,
+          });
+        }
+        break;
+      }
+
+      case 'hubspot_deals': {
+        for (const deal of (entry.data || [])) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Content Download', category: 'Content', source: 'HubSpot',
+            date: deal.closedate || today, confidence: 'High', impact: 'High',
+            title: `Deal: ${deal.name} — ${deal.stage}`,
+            description: `${deal.amount ? `$${deal.amount.toLocaleString()} · ` : ''}${deal.notes || ''}`,
+          });
         }
         break;
       }

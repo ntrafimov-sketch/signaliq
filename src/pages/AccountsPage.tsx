@@ -78,33 +78,37 @@ export function AccountsPage() {
         normalizeDomain(a.domain) === normalizeDomain(accountId) ||
         a.company_name.toLowerCase().trim() === companyName.toLowerCase().trim()
       );
+      const baseId = account ? account.id : `webhook-${Date.now()}`;
+      const baseName = account ? account.company_name : companyName;
+      const updates = importTorpedoJson(torpedoData as Parameters<typeof importTorpedoJson>[0], baseId, baseName);
+
       if (!account) {
-        // Auto-create account from torpedo data
-        const newId = `webhook-${Date.now()}`;
         const newAccount: Account = {
-          id: newId,
+          id: baseId,
           company_name: companyName,
           domain: accountId,
-          industry: 'Unknown',
-          employees: 0,
+          industry: (updates.industry as string) || 'Unknown',
+          employees: updates.employees || 0,
           country: '',
-          score: 0,
-          scoreLabel: 'Cold',
-          signals: [],
-          enrichmentStatus: 'pending',
+          score: updates.score || 0,
+          scoreLabel: updates.scoreLabel || 'Cold',
+          signals: updates.signals || [],
+          enrichmentStatus: 'done',
           lastUpdated: 'Just now',
-          description: '',
-          founded: '',
-          hq: '',
-          revenue: '',
+          description: updates.description || '',
+          founded: updates.founded || '',
+          hq: updates.hq || '',
+          revenue: updates.revenue || '',
           status: 'Private',
           logoColor: '#6366f1',
+          people: updates.people,
+          whyMatters: updates.whyMatters,
+          opportunitySummary: updates.opportunitySummary,
         };
         addAccounts([newAccount]);
-        account = newAccount;
+      } else {
+        updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
       }
-      const updates = importTorpedoJson(torpedoData as Parameters<typeof importTorpedoJson>[0], account.id, account.company_name);
-      updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
     });
     return disconnect;
   }, [accounts, updateAccount]);
