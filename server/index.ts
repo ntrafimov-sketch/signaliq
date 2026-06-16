@@ -60,7 +60,7 @@ app.post('/api/enrich', (req, res) => {
 
 // Serve React frontend
 app.use(express.static(distDir));
-app.get('*', (_req, res) => {
+app.get('/{*path}', (_req, res) => {
   res.sendFile(join(distDir, 'index.html'));
 });
 
