@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Download, Plus, Zap, Building2, Globe, Users, ChevronUp, ChevronDown,
@@ -16,6 +16,7 @@ import { enrichDirect } from '../services/directEnrich';
 import { runResearchAgent } from '../services/researchAgent';
 import { importTorpedoJson } from '../services/importTorpedo';
 import { isClaudeConfigured } from '../services/claude';
+import { connectWebhookListener } from '../services/webhookListener';
 import { calculateAccountScore } from '../services/signals';
 import type { Account } from '../types';
 import { cn } from '../lib/utils';
@@ -67,6 +68,17 @@ export function AccountsPage() {
   const [countryFilter, setCountryFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [sortField, setSortField] = useState<SortField>('score');
+
+  // Listen for Clay webhook enrichments
+  useEffect(() => {
+    const disconnect = connectWebhookListener((accountId, companyName, torpedoData) => {
+      const account = accounts.find(a => a.id === accountId || a.domain === accountId || a.company_name === companyName);
+      if (!account) return;
+      const updates = importTorpedoJson(torpedoData as Parameters<typeof importTorpedoJson>[0], account.id, account.company_name);
+      updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
+    });
+    return disconnect;
+  }, [accounts, updateAccount]);
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [enrichingIds, setEnrichingIds] = useState<Set<string>>(new Set());
   const [progressMessages, setProgressMessages] = useState<Record<string, string>>({});
