@@ -67,7 +67,7 @@ export function subscribeWsStatus(onStatus: StatusHandler) {
   const state = !socket ? 'disconnected'
     : socket.readyState === WebSocket.OPEN ? 'connected' : 'connecting';
   onStatus(state);
-  return () => statusHandlers.delete(onStatus);
+  return () => { statusHandlers.delete(onStatus); };
 }
 
 export function getWsUrl() { return WS_URL; }
