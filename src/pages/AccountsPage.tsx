@@ -115,7 +115,9 @@ export function AccountsPage() {
             logoColor: '#6366f1',
             people: updates.people,
             whyMatters: updates.whyMatters,
+            whyKeywords: updates.whyKeywords,
             opportunitySummary: updates.opportunitySummary,
+            adIntelligence: updates.adIntelligence,
           };
           console.log('[webhook] creating new account', newAccount.company_name, newAccount.id);
           addAccounts([newAccount]);
