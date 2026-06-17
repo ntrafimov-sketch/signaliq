@@ -356,43 +356,11 @@ export function AccountDetailPage() {
 
       {activeTab === 'HubSpot' && (
         <div className="space-y-5">
-          {hubspotSignals.length === 0 && hubspotPeople.length === 0 ? (
+          {hubspotSignals.length === 0 ? (
             <Card>
               <div className="px-5 py-10 text-center text-sm text-gray-400">No HubSpot data available</div>
             </Card>
-          ) : null}
-
-          {/* Contacts from HubSpot */}
-          {hubspotPeople.length > 0 && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-orange-500" />
-                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Contacts</h2>
-                  </div>
-                  <span className="text-xs text-gray-400">{hubspotPeople.length}</span>
-                </div>
-              </CardHeader>
-              <div className="divide-y divide-gray-100">
-                {hubspotPeople.map((person: Person) => (
-                  <div key={person.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar name={person.name} size="sm" color={person.avatarColor} />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{person.name}</p>
-                        <p className="text-xs text-gray-500">{person.title}</p>
-                        {person.email && <p className="text-xs text-gray-400">{person.email}</p>}
-                      </div>
-                    </div>
-                    <InfluenceBadge level={person.influence} />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Deals */}
+          ) : null}          {/* Deals */}
           {hubspotDeals.length > 0 && (
             <Card>
               <CardHeader>
