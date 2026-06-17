@@ -252,7 +252,7 @@ export function AccountDetailPage() {
                 <div className="px-5 py-6 text-center text-sm text-gray-400">No CRM data</div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {hubspotSignals.map((signal: Signal) => (
+                  {hubspotSignals.slice(0, 3).map((signal: Signal) => (
                     <div key={signal.id} className="px-5 py-3.5">
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">{signal.type}</span>
@@ -265,6 +265,14 @@ export function AccountDetailPage() {
                       <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{signal.description}</p>
                     </div>
                   ))}
+                  {hubspotSignals.length > 3 && (
+                    <button
+                      onClick={() => setActiveTab('HubSpot')}
+                      className="w-full px-5 py-2.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium text-left"
+                    >
+                      +{hubspotSignals.length - 3} more → View HubSpot tab
+                    </button>
+                  )}
                 </div>
               )}
             </Card>
