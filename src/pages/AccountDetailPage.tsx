@@ -13,9 +13,9 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import type { Person, Signal, SignalCategory } from '../types';
 
-type Tab = 'Overview' | 'Signals' | 'People' | 'HubSpot';
+type Tab = 'Overview' | 'Signals' | 'People' | 'HubSpot' | 'Ad Channels';
 
-const TABS: Tab[] = ['Overview', 'Signals', 'People', 'HubSpot'];
+const TABS: Tab[] = ['Overview', 'Signals', 'People', 'HubSpot', 'Ad Channels'];
 
 function ScoreRingLarge({ score, tier }: { score: number; tier: string }) {
   const r = 26, circ = 2 * Math.PI * r;
@@ -445,6 +445,84 @@ export function AccountDetailPage() {
                 ))}
               </div>
             </Card>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'Ad Channels' && (
+        <div className="space-y-5">
+          {!account.adIntelligence ? (
+            <Card><div className="px-5 py-10 text-center text-sm text-gray-400">No ad intelligence data</div></Card>
+          ) : (
+            <>
+              {/* Active channels */}
+              <Card>
+                <CardHeader>
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Active UA Channels</h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {account.adIntelligence.activeChannels.map(ch => (
+                      <span key={ch} className={`px-3 py-1 rounded-full text-sm font-medium border ${
+                        account.adIntelligence!.primaryChannels.includes(ch)
+                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                          : 'bg-gray-50 border-gray-200 text-gray-600'
+                      }`}>
+                        {account.adIntelligence!.primaryChannels.includes(ch) ? '★ ' : ''}{ch}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium">Creative Formats</p>
+                      <p className="text-sm text-gray-700 mt-0.5">{account.adIntelligence.creativeFormats.join(', ') || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium">Spend Trend</p>
+                      <p className={`text-sm font-medium mt-0.5 ${account.adIntelligence.spendTrend === 'scaling' ? 'text-green-600' : 'text-gray-700'}`}>
+                        {account.adIntelligence.spendTrend || '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400 font-medium">ASA Present</p>
+                      <p className={`text-sm font-medium mt-0.5 ${account.adIntelligence.asaPresent ? 'text-green-600' : 'text-gray-500'}`}>
+                        {account.adIntelligence.asaPresent ? 'Yes' : 'No'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* UA Sophistication */}
+              {account.adIntelligence.uaSophistication && (
+                <Card>
+                  <CardHeader><h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">UA Sophistication</h2></CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.uaSophistication}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* MMP Gap */}
+              {account.adIntelligence.mmpGap && (
+                <Card>
+                  <CardHeader><h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">MMP / Measurement</h2></CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.mmpGap}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Paywall tension */}
+              {account.adIntelligence.paywallTension && (
+                <Card>
+                  <CardHeader><h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Paywall & Revenue Tension</h2></CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.paywallTension}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </div>
       )}

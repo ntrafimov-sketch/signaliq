@@ -160,6 +160,47 @@ export function PersonDetailPage() {
         </div>
       </div>
 
+      {/* Career track */}
+      {(person.careerTrack ?? []).length > 0 && (
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Career Track</h2>
+          </CardHeader>
+          <div className="divide-y divide-slate-100">
+            {(person.careerTrack ?? []).map((job: import('../types').CareerEntry, i: number) => (
+              <div key={i} className="px-5 py-3.5 flex items-start gap-3">
+                <div className="flex flex-col items-center mt-1">
+                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${i === 0 ? 'bg-indigo-500' : 'bg-slate-200'}`} />
+                  {i < (person.careerTrack ?? []).length - 1 && <div className="w-0.5 h-full bg-slate-100 mt-1 min-h-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{job.title}</p>
+                      <p className="text-sm text-slate-600">{job.company}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xs text-slate-400">{job.start} → {job.end}</p>
+                      <p className="text-xs text-slate-400">{job.duration}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Bio */}
+      {person.bio && (
+        <Card>
+          <CardHeader><h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Bio</h2></CardHeader>
+          <CardContent>
+            <p className="text-sm text-slate-600 leading-relaxed">{person.bio}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Error */}
       {generateError && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">

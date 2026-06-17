@@ -75,6 +75,15 @@ export interface Account {
     recommendedAngle: string;
   };
   departmentIntel?: DepartmentIntelligence[];
+  adIntelligence?: AdIntelligence;
+}
+
+export interface CareerEntry {
+  company: string;
+  title: string;
+  start: string;
+  end: string;
+  duration: string;
 }
 
 export interface Person {
@@ -88,9 +97,22 @@ export interface Person {
   tenure: string;
   linkedin: string;
   email?: string;
+  bio?: string;
   source?: 'amplemarket' | 'hubspot';
   influence: 'High' | 'Medium' | 'Low';
   avatarColor: string;
+  careerTrack?: CareerEntry[];
+}
+
+export interface AdIntelligence {
+  activeChannels: string[];
+  primaryChannels: string[];
+  creativeFormats: string[];
+  spendTrend: string;
+  uaSophistication: string;
+  asaPresent: boolean;
+  mmpGap: string;
+  paywallTension: string;
 }
 
 export interface OutreachMessage {
