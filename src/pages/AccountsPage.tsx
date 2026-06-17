@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Globe, Users, ChevronUp, ChevronDown,
-  CheckCircle2, Plus, Trash2
+  CheckCircle2, Loader2, Plus, Trash2
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { CsvUpload } from '../components/CsvUpload';
@@ -249,14 +249,7 @@ export function AccountsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    {enrichingIds.has(account.id) ? (
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-                        <span className="truncate max-w-32">{progressMessages[account.id] || 'Enriching...'}</span>
-                      </div>
-                    ) : (
-                      <ScoreRing score={account.score} tier={account.scoreLabel} />
-                    )}
+                    <ScoreRing score={account.score} tier={account.scoreLabel} />
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="flex items-center gap-1.5 text-sm text-gray-600">
