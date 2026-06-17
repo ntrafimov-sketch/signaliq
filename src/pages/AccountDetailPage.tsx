@@ -238,44 +238,6 @@ export function AccountDetailPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-orange-500" />
-                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">HubSpot CRM</h2>
-                  </div>
-                  <span className="text-xs text-gray-400">{hubspotSignals.length}</span>
-                </div>
-              </CardHeader>
-              {hubspotSignals.length === 0 ? (
-                <div className="px-5 py-6 text-center text-sm text-gray-400">No CRM data</div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {hubspotSignals.slice(0, 3).map((signal: Signal) => (
-                    <div key={signal.id} className="px-5 py-3.5">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">{signal.type}</span>
-                        <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(signal.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </div>
-                      </div>
-                      <p className="text-sm font-medium text-gray-800 mt-1">{signal.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{signal.description}</p>
-                    </div>
-                  ))}
-                  {hubspotSignals.length > 3 && (
-                    <button
-                      onClick={() => setActiveTab('HubSpot')}
-                      className="w-full px-5 py-2.5 text-xs text-indigo-600 hover:text-indigo-800 font-medium text-left"
-                    >
-                      +{hubspotSignals.length - 3} more → View HubSpot tab
-                    </button>
-                  )}
-                </div>
-              )}
-            </Card>
           </div>
         </div>
       )}
