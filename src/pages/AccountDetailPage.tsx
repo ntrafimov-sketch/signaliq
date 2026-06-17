@@ -79,11 +79,16 @@ export function AccountDetailPage() {
   const scoreTierVariant = { Hot: 'hot', Warm: 'warm', Cold: 'cold' } as const;
 
 
-  const hubspotDeals = account.signals.filter((s: Signal) =>
-    s.source === 'HubSpot' && s.type === 'Content Download'
-  );
-  const hubspotEngagement = account.signals.filter((s: Signal) =>
-    s.source === 'HubSpot' && s.type !== 'Content Download'
+  const byDate = (a: Signal, b: Signal) => new Date(b.date).getTime() - new Date(a.date).getTime();
+
+  const hubspotDeals = account.signals
+    .filter((s: Signal) => s.source === 'HubSpot' && s.title.startsWith('Deal:'))
+    .sort(byDate);
+  const hubspotContent = account.signals
+    .filter((s: Signal) => s.source === 'HubSpot' && !s.title.startsWith('Deal:') && s.type !== 'Webinar Visited')
+    .sort(byDate);
+  const hubspotEngagement = account.signals
+    .filter((s: Signal) => s.source === 'HubSpot' && s.type === 'Webinar Visited')
   );
   const amplemarketPeople = (account.people ?? []).filter(p => p.source !== 'hubspot');
 
@@ -355,11 +360,27 @@ export function AccountDetailPage() {
 
       {activeTab === 'HubSpot' && (
         <div className="space-y-5">
-          {hubspotSignals.length === 0 ? (
+            {hubspotSignals.length === 0 ? (
             <Card>
               <div className="px-5 py-10 text-center text-sm text-gray-400">No HubSpot data available</div>
             </Card>
-          ) : null}          {/* Deals */}
+          ) : null}
+
+          {/* Engagement summary */}
+          {hubspotEngagement.length > 0 && (
+            <Card>
+              <CardContent>
+                {hubspotEngagement.map((signal: Signal) => (
+                  <div key={signal.id}>
+                    <p className="text-sm font-semibold text-gray-900">{signal.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{signal.description}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Deals */}
           {hubspotDeals.length > 0 && (
             <Card>
               <CardHeader>
@@ -388,23 +409,26 @@ export function AccountDetailPage() {
             </Card>
           )}
 
-          {/* Engagement */}
-          {hubspotEngagement.length > 0 && (
+          {/* Content Consumption */}
+          {hubspotContent.length > 0 && (
             <Card>
               <CardHeader>
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-green-500" />
-                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Engagement</h2>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-indigo-500" />
+                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Content Consumption</h2>
+                  </div>
+                  <span className="text-xs text-gray-400">{hubspotContent.length}</span>
                 </div>
               </CardHeader>
               <div className="divide-y divide-gray-100">
-                {hubspotEngagement.map((signal: Signal) => (
+                {hubspotContent.map((signal: Signal) => (
                   <div key={signal.id} className="px-5 py-3.5">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium text-gray-900">{signal.title}</p>
                       <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
                         <Calendar className="w-3 h-3" />
-                        {new Date(signal.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {new Date(signal.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{signal.description}</p>
