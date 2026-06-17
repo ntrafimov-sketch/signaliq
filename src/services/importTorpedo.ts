@@ -19,6 +19,7 @@ export function importTorpedoJson(
   const updates: Partial<Account> = {};
 
   for (const entry of entries) {
+    if (!entry || !entry.type || entry.data === undefined) continue;
     switch (entry.type) {
       case 'company_intel': {
         const d = entry.data;

@@ -74,43 +74,51 @@ export function AccountsPage() {
       d.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
 
     const disconnect = connectWebhookListener((accountId, companyName, torpedoData) => {
-      const current = accountsRef.current;
-      const account = current.find(a =>
-        a.id === accountId ||
-        normalizeDomain(a.domain) === normalizeDomain(accountId) ||
-        a.company_name.toLowerCase().trim() === companyName.toLowerCase().trim()
-      );
-      const baseId = account ? account.id : `webhook-${Date.now()}`;
-      const baseName = account ? account.company_name : companyName;
-      const updates = importTorpedoJson(torpedoData as Parameters<typeof importTorpedoJson>[0], baseId, baseName);
+      try {
+        const current = accountsRef.current;
+        const account = current.find(a =>
+          a.id === accountId ||
+          normalizeDomain(a.domain) === normalizeDomain(accountId) ||
+          a.company_name.toLowerCase().trim() === companyName.toLowerCase().trim()
+        );
+        const baseId = account ? account.id : `webhook-${Date.now()}`;
+        const baseName = account ? account.company_name : companyName;
 
-      if (!account) {
-        const newAccount: Account = {
-          id: baseId,
-          company_name: companyName,
-          domain: accountId,
-          industry: (updates.industry as string) || 'Unknown',
-          employees: updates.employees || 0,
-          country: '',
-          score: updates.score || 0,
-          scoreLabel: updates.scoreLabel || 'Cold',
-          signals: updates.signals || [],
-          enrichmentStatus: 'done',
-          lastUpdated: 'Just now',
-          description: updates.description || '',
-          founded: updates.founded || '',
-          hq: updates.hq || '',
-          revenue: updates.revenue || '',
-          lastMonthRevenue: updates.lastMonthRevenue,
-          status: 'Private',
-          logoColor: '#6366f1',
-          people: updates.people,
-          whyMatters: updates.whyMatters,
-          opportunitySummary: updates.opportunitySummary,
-        };
-        addAccounts([newAccount]);
-      } else {
-        updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
+        const safeData = Array.isArray(torpedoData) ? torpedoData : [];
+        const updates = importTorpedoJson(safeData as Parameters<typeof importTorpedoJson>[0], baseId, baseName);
+
+        if (!account) {
+          const newAccount: Account = {
+            id: baseId,
+            company_name: companyName,
+            domain: accountId,
+            industry: (updates.industry as string) || 'Unknown',
+            employees: updates.employees || 0,
+            country: '',
+            score: updates.score || 0,
+            scoreLabel: updates.scoreLabel || 'Cold',
+            signals: updates.signals || [],
+            enrichmentStatus: 'done',
+            lastUpdated: 'Just now',
+            description: updates.description || '',
+            founded: updates.founded || '',
+            hq: updates.hq || '',
+            revenue: updates.revenue || '',
+            lastMonthRevenue: updates.lastMonthRevenue,
+            status: 'Private',
+            logoColor: '#6366f1',
+            people: updates.people,
+            whyMatters: updates.whyMatters,
+            opportunitySummary: updates.opportunitySummary,
+          };
+          console.log('[webhook] creating new account', newAccount.company_name, newAccount.id);
+          addAccounts([newAccount]);
+        } else {
+          console.log('[webhook] updating existing account', account.company_name);
+          updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
+        }
+      } catch (err) {
+        console.error('[webhook] handler error', err);
       }
     });
     return disconnect;
