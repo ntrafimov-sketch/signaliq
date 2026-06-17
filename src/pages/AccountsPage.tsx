@@ -84,7 +84,13 @@ export function AccountsPage() {
         const baseId = account ? account.id : `webhook-${Date.now()}`;
         const baseName = account ? account.company_name : companyName;
 
-        const safeData = Array.isArray(torpedoData) ? torpedoData : [];
+        console.log('[webhook] torpedoData type:', typeof torpedoData, Array.isArray(torpedoData), torpedoData);
+        // Clay sometimes sends an object instead of array — wrap it
+        const safeData: unknown[] = Array.isArray(torpedoData)
+          ? torpedoData
+          : torpedoData && typeof torpedoData === 'object'
+          ? Object.values(torpedoData as Record<string, unknown>)
+          : [];
         const updates = importTorpedoJson(safeData as Parameters<typeof importTorpedoJson>[0], baseId, baseName);
 
         if (!account) {
