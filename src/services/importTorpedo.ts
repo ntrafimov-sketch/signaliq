@@ -47,12 +47,14 @@ export function importTorpedoJson(
         const points: { month?: string; date?: string; revenue: number; downloads: number; note?: string }[] =
           entry.data.filter((p: { note?: string }) => !p.note?.includes('Partial'));
         if (points.length > 0) {
-          const lastRev = points[points.length - 1].revenue;
-          updates.lastMonthRevenue = lastRev >= 1_000_000
-            ? `$${(lastRev / 1_000_000).toFixed(1)}M/mo`
-            : lastRev >= 1_000
-            ? `$${Math.round(lastRev / 1_000)}K/mo`
-            : `$${Math.round(lastRev)}/mo`;
+          const lastRev = points[points.length - 1].revenue || 0;
+          if (lastRev > 0) {
+            updates.lastMonthRevenue = lastRev >= 1_000_000
+              ? `$${(lastRev / 1_000_000).toFixed(1)}M/mo`
+              : lastRev >= 1_000
+              ? `$${Math.round(lastRev / 1_000)}K/mo`
+              : `$${Math.round(lastRev)}/mo`;
+          }
         }
         if (points.length >= 4) {
           const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;

@@ -78,6 +78,7 @@ export function AccountDetailPage() {
 
   const scoreTierVariant = { Hot: 'hot', Warm: 'warm', Cold: 'cold' } as const;
 
+
   const hubspotDeals = account.signals.filter((s: Signal) =>
     s.source === 'HubSpot' && s.type === 'Content Download'
   );
