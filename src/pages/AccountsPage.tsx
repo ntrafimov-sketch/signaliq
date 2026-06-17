@@ -8,7 +8,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
 import { importTorpedoJson } from '../services/importTorpedo';
-import { connectWebhookListener } from '../services/webhookListener';
+import { connectWebhookListener, subscribeWsStatus, getWsUrl } from '../services/webhookListener';
 import type { Account } from '../types';
 import { cn } from '../lib/utils';
 
@@ -54,6 +54,16 @@ export function AccountsPage() {
   const [sortField, setSortField] = useState<SortField>('score');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [wsLastMsg, setWsLastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsub = subscribeWsStatus((status, msg) => {
+      setWsStatus(status);
+      if (msg) setWsLastMsg(msg);
+    });
+    return () => unsub();
+  }, []);
 
   // Keep a ref to latest accounts so the webhook handler never captures stale closure
   const accountsRef = useRef(accounts);
@@ -174,6 +184,20 @@ export function AccountsPage() {
           <Plus className="w-4 h-4" />
           Add Company
         </button>
+      </div>
+
+      {/* WebSocket status */}
+      <div className="flex items-center gap-2 text-xs text-gray-400">
+        <span className={cn('w-2 h-2 rounded-full flex-shrink-0',
+          wsStatus === 'connected' ? 'bg-green-500' :
+          wsStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+        )} />
+        <span>
+          {wsStatus === 'connected' ? `Live · ${getWsUrl()}` :
+           wsStatus === 'connecting' ? `Connecting to ${getWsUrl()}…` :
+           `Disconnected · ${getWsUrl()}`}
+        </span>
+        {wsLastMsg && <span className="text-green-600 font-medium">· {wsLastMsg}</span>}
       </div>
 
       {/* Upload success banner */}
