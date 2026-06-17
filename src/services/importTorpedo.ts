@@ -93,8 +93,15 @@ export function importTorpedoJson(
       case 'sdks': {
         const PAYWALL = ['revenuecat', 'superwall', 'purchasely', 'qonversion', 'apphud'];
         const LIFECYCLE = ['braze', 'customer.io', 'customerio', 'clevertap', 'leanplum', 'intercom'];
-        const paywall = entry.data.filter((s: { name: string }) => PAYWALL.some(p => s.name.toLowerCase().includes(p)));
-        const lifecycle = entry.data.filter((s: { name: string }) => LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
+        // data can be a flat array OR {ios: [...], android: [...]}
+        const sdkList: { name: string }[] = Array.isArray(entry.data)
+          ? entry.data
+          : [
+              ...((entry.data.ios || []) as { name: string }[]),
+              ...((entry.data.android || []) as { name: string }[]),
+            ].filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i);
+        const paywall = sdkList.filter((s) => PAYWALL.some(p => s.name.toLowerCase().includes(p)));
+        const lifecycle = sdkList.filter((s) => LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
         if (paywall.length) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
@@ -174,13 +181,55 @@ export function importTorpedoJson(
       }
 
       case 'hubspot_deals': {
-        for (const deal of (entry.data || []) as { name: string; stage: string; amount?: number; closedate?: string; notes?: string }[]) {
+        for (const deal of (entry.data || []) as { name?: string; dealname?: string; stage: string; amount?: number | null; closedate?: string; createdate?: string; notes?: string }[]) {
+          const name = deal.dealname || deal.name || 'Deal';
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Content Download', category: 'Content', source: 'HubSpot',
-            date: deal.closedate || today, confidence: 'High', impact: 'High',
-            title: `Deal: ${deal.name} — ${deal.stage}`,
+            date: deal.closedate || deal.createdate || today, confidence: 'High', impact: 'High',
+            title: `Deal: ${name} — ${deal.stage}`,
             description: `${deal.amount ? `$${deal.amount.toLocaleString()} · ` : ''}${deal.notes || ''}`,
+          });
+        }
+        break;
+      }
+
+      case 'hubspot_company_engagement': {
+        const d = entry.data;
+        const totals = d.company_totals || {};
+        if (totals.contacts_found || totals.total_sessions) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Webinar Visited', category: 'Content', source: 'HubSpot',
+            date: totals.last_touch_date || today, confidence: 'High', impact: 'High',
+            title: `${totals.contacts_found || 0} contacts · ${totals.total_sessions || 0} sessions · ${totals.total_conversion_events || 0} conversions`,
+            description: `First touch: ${totals.first_touch_date || 'unknown'} · Last touch: ${totals.last_touch_date || 'unknown'}`,
+          });
+        }
+        // Store contacts as hubspot people
+        const contacts = (d.contacts_summary || []) as { name: string; email?: string; status?: string; conversion_count?: number }[];
+        if (contacts.length) {
+          const people: Person[] = contacts.map((c, i) => ({
+            id: genId('person'), accountId, name: c.name,
+            title: c.status || '', company: companyName,
+            department: guessDepartment(c.status || ''),
+            location: '', tenure: '', linkedin: '',
+            email: c.email,
+            source: 'hubspot' as const,
+            influence: (c.conversion_count && c.conversion_count > 5 ? 'High' : c.conversion_count && c.conversion_count > 0 ? 'Medium' : 'Low') as 'High' | 'Medium' | 'Low',
+            avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+          }));
+          updates.people = [...(updates.people || []), ...people];
+        }
+        // Content timeline as signals
+        const timeline = (d.content_timeline || []) as { date: string; person: string; event: string; url?: string; source?: string }[];
+        for (const item of timeline.slice(-5)) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Content Download', category: 'Content', source: 'HubSpot',
+            date: item.date, confidence: 'High', impact: 'Medium',
+            title: item.event,
+            description: `${item.person}${item.source ? ` · ${item.source}` : ''}`,
           });
         }
         break;
@@ -200,18 +249,29 @@ export function importTorpedoJson(
       }
 
       case 'contacts': {
-        const people: Person[] = (entry.data as { name: string; title: string; linkedin?: string; email?: string; location?: string }[])
-          .map((c, i) => ({
+        const people: Person[] = (entry.data as {
+          name: string;
+          title?: string;
+          linkedin?: string;
+          linkedin_url?: string;
+          email?: string;
+          location?: string;
+          overview?: { current_title?: string; email?: string; location?: string };
+        }[]).map((c, i) => {
+          const title = c.title || c.overview?.current_title || '';
+          const email = c.email || c.overview?.email || undefined;
+          const location = c.location || c.overview?.location || '';
+          const linkedin = c.linkedin || c.linkedin_url || '';
+          return {
             id: genId('person'), accountId,
-            name: c.name, title: c.title, company: companyName,
-            department: guessDepartment(c.title),
-            location: c.location || '', tenure: '',
-            linkedin: c.linkedin || '',
-            email: c.email,
+            name: c.name, title, company: companyName,
+            department: guessDepartment(title),
+            location, tenure: '', linkedin, email,
             source: 'amplemarket' as const,
-            influence: guessInfluence(c.title) as 'High' | 'Medium' | 'Low',
+            influence: guessInfluence(title) as 'High' | 'Medium' | 'Low',
             avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
-          }));
+          };
+        });
         updates.people = people;
         break;
       }
