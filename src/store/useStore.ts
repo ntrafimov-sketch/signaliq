@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Account, Signal, List, ApiKeys } from '../types';
-import { mockAccounts, mockLists } from '../data/mockData';
+import { mockLists } from '../data/mockData';
 
 interface AppState {
   accounts: Account[];
@@ -32,7 +32,7 @@ interface AppState {
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
-      accounts: mockAccounts,
+      accounts: [],
       lists: mockLists,
       apiKeys: {
         amplemarket: import.meta.env.VITE_AMPLEMARKET_API_KEY || '',
@@ -92,6 +92,7 @@ export const useStore = create<AppState>()(
     {
       name: 'signaliq-storage',
       partialize: (state) => ({
+        accounts: state.accounts,
         apiKeys: state.apiKeys,
       }),
     }
