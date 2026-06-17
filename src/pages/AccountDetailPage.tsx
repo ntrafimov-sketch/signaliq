@@ -88,8 +88,7 @@ export function AccountDetailPage() {
     .filter((s: Signal) => s.source === 'HubSpot' && !s.title.startsWith('Deal:') && s.type !== 'Webinar Visited')
     .sort(byDate);
   const hubspotEngagement = account.signals
-    .filter((s: Signal) => s.source === 'HubSpot' && s.type === 'Webinar Visited')
-  );
+    .filter((s: Signal) => s.source === 'HubSpot' && s.type === 'Webinar Visited');
   const amplemarketPeople = (account.people ?? []).filter(p => p.source !== 'hubspot');
 
   return (
