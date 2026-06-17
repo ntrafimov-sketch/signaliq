@@ -348,7 +348,8 @@ export function AccountDetailPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {amplemarketPeople.map((person: Person) => (
-                <Card key={person.id} className="p-4 hover:shadow-md transition-shadow">
+                <Link key={person.id} to={`/accounts/${account.id}/people/${person.id}`}>
+                <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
                   <div className="flex items-start gap-3">
                     <Avatar name={person.name} size="md" color={person.avatarColor} />
                     <div className="flex-1 min-w-0">
@@ -376,6 +377,7 @@ export function AccountDetailPage() {
                     </div>
                   </div>
                 </Card>
+                </Link>
               ))}
             </div>
           )}
