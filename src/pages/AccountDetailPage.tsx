@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Download, RefreshCw,
-  Calendar, MessageSquare, Briefcase, ChevronDown, ChevronRight, Linkedin
+  Calendar, MessageSquare, Briefcase, ChevronDown, ChevronRight, ExternalLink
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -361,7 +361,7 @@ export function AccountDetailPage() {
                             onClick={e => e.stopPropagation()}
                             className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 hover:text-blue-800"
                           >
-                            <Linkedin className="w-3 h-3" />
+                            <ExternalLink className="w-3 h-3" />
                             LinkedIn
                           </a>
                         )}

@@ -4,7 +4,6 @@ import {
   Search, Globe, Users, ChevronUp, ChevronDown,
   CheckCircle2, Loader2, Plus, Trash2
 } from 'lucide-react';
-import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Avatar';
 import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
@@ -91,6 +90,7 @@ export function AccountsPage() {
     return disconnect;
   }, [accounts, updateAccount, addAccounts]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const startEnrichment = useCallback(async (account: Account) => {
     setEnrichingIds(prev => new Set(prev).add(account.id));
     updateAccount(account.id, { enrichmentStatus: 'enriching' });
