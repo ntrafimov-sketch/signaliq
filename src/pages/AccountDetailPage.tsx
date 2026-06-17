@@ -13,9 +13,9 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import type { Person, Signal, SignalCategory } from '../types';
 
-type Tab = 'Overview' | 'Signals' | 'People' | 'Deals';
+type Tab = 'Overview' | 'Signals' | 'People' | 'HubSpot';
 
-const TABS: Tab[] = ['Overview', 'Signals', 'People', 'Deals'];
+const TABS: Tab[] = ['Overview', 'Signals', 'People', 'HubSpot'];
 
 function ScoreRingLarge({ score, tier }: { score: number; tier: string }) {
   const r = 26, circ = 2 * Math.PI * r;
@@ -78,8 +78,11 @@ export function AccountDetailPage() {
 
   const scoreTierVariant = { Hot: 'hot', Warm: 'warm', Cold: 'cold' } as const;
 
-  const dealSignals = account.signals.filter((s: Signal) =>
-    s.source === 'HubSpot' || s.category === 'Revenue'
+  const hubspotDeals = account.signals.filter((s: Signal) =>
+    s.source === 'HubSpot' && s.type === 'Content Download'
+  );
+  const hubspotEngagement = account.signals.filter((s: Signal) =>
+    s.source === 'HubSpot' && s.type !== 'Content Download'
   );
 
   return (
@@ -94,7 +97,7 @@ export function AccountDetailPage() {
         <div className="flex items-start justify-between gap-6 flex-wrap">
           {/* Left: Company info */}
           <div className="flex items-start gap-4">
-            <Avatar name={account.company_name} size="xl" />
+            <CompanyLogo domain={account.domain} name={account.company_name} />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{account.company_name}</h1>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -220,7 +223,7 @@ export function AccountDetailPage() {
                   {[
                     { label: 'Founded', value: account.founded },
                     { label: 'HQ', value: account.hq },
-                    { label: 'Revenue', value: account.revenue },
+                    { label: 'Monthly Tracked Revenue', value: account.lastMonthRevenue || account.revenue },
                     { label: 'Status', value: account.status },
                   ].map(item => (
                     <div key={item.label}>
@@ -375,34 +378,102 @@ export function AccountDetailPage() {
         </div>
       )}
 
-      {activeTab === 'Deals' && (
-        <div className="space-y-4">
-          {dealSignals.length === 0 ? (
-            <Card>
-              <div className="px-5 py-10 text-center text-sm text-gray-400">No deal signals found</div>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {dealSignals.map((signal: Signal) => (
-                <Card key={signal.id}>
-                  <div className="px-5 py-4">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-2">
-                        <Briefcase className="w-4 h-4 text-blue-500" />
-                        <SignalCategoryBadge category={signal.category} />
+      {activeTab === 'HubSpot' && (
+        <div className="space-y-5">
+          {/* Contacts */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-orange-500" />
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Contacts</h2>
+                </div>
+                <span className="text-xs text-gray-400">{(account.people ?? []).length}</span>
+              </div>
+            </CardHeader>
+            {(account.people ?? []).length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-400">No contacts in HubSpot</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {(account.people ?? []).map((person: Person) => (
+                  <div key={person.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={person.name} size="sm" color={person.avatarColor} />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{person.name}</p>
+                        <p className="text-xs text-gray-500">{person.title}</p>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <InfluenceBadge level={person.influence} />
+                      {person.linkedin && (
+                        <a href={person.linkedin} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-0.5">
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Deals */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-blue-500" />
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Deals</h2>
+                </div>
+                <span className="text-xs text-gray-400">{hubspotDeals.length}</span>
+              </div>
+            </CardHeader>
+            {hubspotDeals.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-gray-400">No deals in HubSpot</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {hubspotDeals.map((signal: Signal) => (
+                  <div key={signal.id} className="px-5 py-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-900">{signal.title}</p>
                       <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
                         <Calendar className="w-3 h-3" />
                         {new Date(signal.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </div>
                     </div>
-                    <p className="text-sm font-semibold text-gray-900">{signal.title}</p>
-                    <p className="text-sm text-gray-500 mt-1 leading-relaxed">{signal.description}</p>
-                    <p className="text-xs text-gray-400 mt-2">via {signal.source}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{signal.description}</p>
                   </div>
-                </Card>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Engagement / other HubSpot signals */}
+          {hubspotEngagement.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-green-500" />
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Engagement</h2>
+                </div>
+              </CardHeader>
+              <div className="divide-y divide-gray-100">
+                {hubspotEngagement.map((signal: Signal) => (
+                  <div key={signal.id} className="px-5 py-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-900">{signal.title}</p>
+                      <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
+                        <Calendar className="w-3 h-3" />
+                        {new Date(signal.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{signal.description}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
           )}
         </div>
       )}
@@ -466,6 +537,22 @@ export function AccountDetailPage() {
       )}
     </div>
   );
+}
+
+function CompanyLogo({ domain, name }: { domain: string; name: string }) {
+  const [failed, setFailed] = useState(false);
+  const cleanDomain = domain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+  if (!failed) {
+    return (
+      <img
+        src={`https://logo.clearbit.com/${cleanDomain}`}
+        alt={name}
+        onError={() => setFailed(true)}
+        className="w-14 h-14 rounded-xl object-contain bg-white border border-gray-100 p-1"
+      />
+    );
+  }
+  return <Avatar name={name} size="xl" />;
 }
 
 function InfluenceBadge({ level }: { level: 'High' | 'Medium' | 'Low' }) {

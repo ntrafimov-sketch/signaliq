@@ -31,6 +31,22 @@ function ScoreRing({ score, tier }: { score: number; tier: string }) {
   );
 }
 
+function AccountLogo({ domain, name }: { domain: string; name: string }) {
+  const [failed, setFailed] = useState(false);
+  const cleanDomain = domain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+  if (!failed) {
+    return (
+      <img
+        src={`https://logo.clearbit.com/${cleanDomain}`}
+        alt={name}
+        onError={() => setFailed(true)}
+        className="w-8 h-8 rounded-lg object-contain bg-white border border-gray-100 p-0.5"
+      />
+    );
+  }
+  return <Avatar name={name} size="sm" />;
+}
+
 export function AccountsPage() {
   const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount } = useStore();
   const [search, setSearch] = useState('');
@@ -238,7 +254,7 @@ export function AccountsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <Link to={`/accounts/${account.id}`} className="flex items-center gap-3">
-                      <Avatar name={account.company_name} size="sm" />
+                      <AccountLogo domain={account.domain} name={account.company_name} />
                       <div>
                         <p className="font-medium text-gray-900 text-sm">{account.company_name}</p>
                         <div className="flex items-center gap-1 text-xs text-gray-400">

@@ -61,6 +61,7 @@ export interface Account {
   founded: string;
   hq: string;
   revenue: string;
+  lastMonthRevenue?: string;
   status: string;
   logoColor: string;
   enrichmentStatus?: EnrichmentStatus;
