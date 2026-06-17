@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Globe, Users, ChevronUp, ChevronDown,
@@ -55,11 +55,17 @@ export function AccountsPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Listen for Clay webhook enrichments
+  // Keep a ref to latest accounts so the webhook handler never captures stale closure
+  const accountsRef = useRef(accounts);
+  accountsRef.current = accounts;
+
   useEffect(() => {
+    const normalizeDomain = (d: string) =>
+      d.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+
     const disconnect = connectWebhookListener((accountId, companyName, torpedoData) => {
-      const normalizeDomain = (d: string) => d.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
-      const account = accounts.find(a =>
+      const current = accountsRef.current;
+      const account = current.find(a =>
         a.id === accountId ||
         normalizeDomain(a.domain) === normalizeDomain(accountId) ||
         a.company_name.toLowerCase().trim() === companyName.toLowerCase().trim()
@@ -85,6 +91,7 @@ export function AccountsPage() {
           founded: updates.founded || '',
           hq: updates.hq || '',
           revenue: updates.revenue || '',
+          lastMonthRevenue: updates.lastMonthRevenue,
           status: 'Private',
           logoColor: '#6366f1',
           people: updates.people,
@@ -97,7 +104,8 @@ export function AccountsPage() {
       }
     });
     return disconnect;
-  }, [accounts, updateAccount, addAccounts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addAccounts, updateAccount]);
 
 
   const filtered = accounts
