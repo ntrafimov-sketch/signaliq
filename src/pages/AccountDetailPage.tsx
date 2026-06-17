@@ -84,6 +84,8 @@ export function AccountDetailPage() {
   const hubspotEngagement = account.signals.filter((s: Signal) =>
     s.source === 'HubSpot' && s.type !== 'Content Download'
   );
+  const amplemarketPeople = (account.people ?? []).filter(p => p.source !== 'hubspot');
+  const hubspotPeople = (account.people ?? []).filter(p => p.source === 'hubspot');
 
   return (
     <div className="space-y-5">
@@ -223,7 +225,7 @@ export function AccountDetailPage() {
                   {[
                     { label: 'Founded', value: account.founded },
                     { label: 'HQ', value: account.hq },
-                    { label: 'Monthly Tracked Revenue', value: account.lastMonthRevenue || account.revenue },
+                    { label: 'Monthly Tracked Revenue', value: account.lastMonthRevenue || '—' },
                     { label: 'Status', value: account.status },
                   ].map(item => (
                     <div key={item.label}>
@@ -338,31 +340,32 @@ export function AccountDetailPage() {
 
       {activeTab === 'People' && (
         <div className="space-y-4">
-          {(account.people ?? []).length === 0 ? (
+          {amplemarketPeople.length === 0 ? (
             <Card>
-              <div className="px-5 py-10 text-center text-sm text-gray-400">No contacts found</div>
+              <div className="px-5 py-10 text-center text-sm text-gray-400">No Amplemarket contacts found</div>
             </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(account.people ?? []).map((person: Person) => (
-                <Link key={person.id} to={`/accounts/${account.id}/people/${person.id}`}>
-                  <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
-                    <div className="flex items-start gap-3">
-                      <Avatar name={person.name} size="md" color={person.avatarColor} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-semibold text-gray-900">{person.name}</p>
-                          <InfluenceBadge level={person.influence} />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{person.title}</p>
-                        <p className="text-xs text-gray-400">{person.department}</p>
+              {amplemarketPeople.map((person: Person) => (
+                <Card key={person.id} className="p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start gap-3">
+                    <Avatar name={person.name} size="md" color={person.avatarColor} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-900">{person.name}</p>
+                        <InfluenceBadge level={person.influence} />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{person.title}</p>
+                      <p className="text-xs text-gray-400">{person.department}</p>
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                        {person.email && (
+                          <a href={`mailto:${person.email}`}
+                            className="text-xs text-gray-500 hover:text-gray-800 truncate max-w-full"
+                          >{person.email}</a>
+                        )}
                         {person.linkedin && (
-                          <a
-                            href={person.linkedin}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 hover:text-blue-800"
+                          <a href={person.linkedin} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
                           >
                             <ExternalLink className="w-3 h-3" />
                             LinkedIn
@@ -370,8 +373,8 @@ export function AccountDetailPage() {
                         )}
                       </div>
                     </div>
-                  </Card>
-                </Link>
+                  </div>
+                </Card>
               ))}
             </div>
           )}
@@ -380,59 +383,54 @@ export function AccountDetailPage() {
 
       {activeTab === 'HubSpot' && (
         <div className="space-y-5">
-          {/* Contacts */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-orange-500" />
-                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Contacts</h2>
+          {hubspotSignals.length === 0 && hubspotPeople.length === 0 ? (
+            <Card>
+              <div className="px-5 py-10 text-center text-sm text-gray-400">No HubSpot data available</div>
+            </Card>
+          ) : null}
+
+          {/* Contacts from HubSpot */}
+          {hubspotPeople.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-orange-500" />
+                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Contacts</h2>
+                  </div>
+                  <span className="text-xs text-gray-400">{hubspotPeople.length}</span>
                 </div>
-                <span className="text-xs text-gray-400">{(account.people ?? []).length}</span>
-              </div>
-            </CardHeader>
-            {(account.people ?? []).length === 0 ? (
-              <div className="px-5 py-8 text-center text-sm text-gray-400">No contacts in HubSpot</div>
-            ) : (
+              </CardHeader>
               <div className="divide-y divide-gray-100">
-                {(account.people ?? []).map((person: Person) => (
+                {hubspotPeople.map((person: Person) => (
                   <div key={person.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <Avatar name={person.name} size="sm" color={person.avatarColor} />
                       <div>
                         <p className="text-sm font-medium text-gray-900">{person.name}</p>
                         <p className="text-xs text-gray-500">{person.title}</p>
+                        {person.email && <p className="text-xs text-gray-400">{person.email}</p>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <InfluenceBadge level={person.influence} />
-                      {person.linkedin && (
-                        <a href={person.linkedin} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-0.5">
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
+                    <InfluenceBadge level={person.influence} />
                   </div>
                 ))}
               </div>
-            )}
-          </Card>
+            </Card>
+          )}
 
           {/* Deals */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-blue-500" />
-                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Deals</h2>
+          {hubspotDeals.length > 0 && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-blue-500" />
+                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Deals</h2>
+                  </div>
+                  <span className="text-xs text-gray-400">{hubspotDeals.length}</span>
                 </div>
-                <span className="text-xs text-gray-400">{hubspotDeals.length}</span>
-              </div>
-            </CardHeader>
-            {hubspotDeals.length === 0 ? (
-              <div className="px-5 py-8 text-center text-sm text-gray-400">No deals in HubSpot</div>
-            ) : (
+              </CardHeader>
               <div className="divide-y divide-gray-100">
                 {hubspotDeals.map((signal: Signal) => (
                   <div key={signal.id} className="px-5 py-3.5">
@@ -447,10 +445,10 @@ export function AccountDetailPage() {
                   </div>
                 ))}
               </div>
-            )}
-          </Card>
+            </Card>
+          )}
 
-          {/* Engagement / other HubSpot signals */}
+          {/* Engagement */}
           {hubspotEngagement.length > 0 && (
             <Card>
               <CardHeader>

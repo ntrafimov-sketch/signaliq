@@ -87,6 +87,8 @@ export interface Person {
   location: string;
   tenure: string;
   linkedin: string;
+  email?: string;
+  source?: 'amplemarket' | 'hubspot';
   influence: 'High' | 'Medium' | 'Low';
   avatarColor: string;
 }

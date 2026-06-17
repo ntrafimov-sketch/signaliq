@@ -153,6 +153,8 @@ export function importTorpedoJson(
             title: c.status || '', company: companyName,
             department: guessDepartment(c.status || ''),
             location: '', tenure: '', linkedin: '',
+            email: c.email,
+            source: 'hubspot' as const,
             influence: guessInfluence(c.status || '') as 'High' | 'Medium' | 'Low',
             avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
           }));
@@ -202,6 +204,8 @@ export function importTorpedoJson(
             department: guessDepartment(c.title),
             location: c.location || '', tenure: '',
             linkedin: c.linkedin || '',
+            email: c.email,
+            source: 'amplemarket' as const,
             influence: guessInfluence(c.title) as 'High' | 'Medium' | 'Low',
             avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
           }));
