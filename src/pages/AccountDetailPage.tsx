@@ -86,7 +86,6 @@ export function AccountDetailPage() {
     s.source === 'HubSpot' && s.type !== 'Content Download'
   );
   const amplemarketPeople = (account.people ?? []).filter(p => p.source !== 'hubspot');
-  const hubspotPeople = (account.people ?? []).filter(p => p.source === 'hubspot');
 
   return (
     <div className="space-y-5">
