@@ -75,7 +75,7 @@ app.post('/api/enrich', (req, res) => {
   console.log('[server] received body keys:', Object.keys(body));
   console.log('[server] data type:', typeof data, 'isArray:', Array.isArray(data), 'length:', Array.isArray(data) ? data.length : 'n/a');
   if (Array.isArray(data)) {
-    console.log('[server] entry types:', data.map((e: { type?: string }) => e?.type));
+    console.log('[server] entry types:', data.map((e: unknown) => (e as { type?: string })?.type));
   }
 
   if (!data) {
