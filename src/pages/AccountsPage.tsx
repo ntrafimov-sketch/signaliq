@@ -49,13 +49,15 @@ function AccountLogo({ domain, name }: { domain: string; name: string }) {
 
 const BRIDGE = 'http://localhost:7337';
 
-function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onResearching: (company: string, domain: string) => void }) {
+function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onResearching: (company: string, domain: string, paywallPreview?: string) => void }) {
   const [tab, setTab] = useState<'ai' | 'csv'>('ai');
   const [bridgeOk, setBridgeOk] = useState<boolean | null>(null);
   const [form, setForm] = useState({ company: '', app_name: '', domain: '', linkedin: '' });
   const [status, setStatus] = useState<'idle' | 'launching' | 'done' | 'copied'>('idle');
   const [image, setImage] = useState<{ b64: string; preview: string; name: string } | null>(null);
+  const [paywallImage, setPaywallImage] = useState<{ b64: string; preview: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const paywallFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`${BRIDGE}/health`, { signal: AbortSignal.timeout(1500) })
@@ -84,6 +86,18 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
     reader.readAsDataURL(file);
   };
 
+  const handlePaywallImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const b64 = result.split(',')[1];
+      setPaywallImage({ b64, preview: result, name: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleLaunch = async () => {
     setStatus('launching');
     if (bridgeOk) {
@@ -91,11 +105,11 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
         const res = await fetch(`${BRIDGE}/trigger`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form, image_b64: image?.b64 ?? null }),
+          body: JSON.stringify({ ...form, image_b64: image?.b64 ?? null, paywall_image_b64: paywallImage?.b64 ?? null }),
         });
         if (res.ok) {
           setStatus('done');
-          onResearching(form.company, form.domain);
+          onResearching(form.company, form.domain, paywallImage?.preview);
           setTimeout(onClose, 1500);
         } else throw new Error();
       } catch {
@@ -188,6 +202,30 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
                   className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-violet-300 hover:text-violet-500 hover:bg-violet-50/30 transition-all">
                   <ImagePlus className="w-4 h-4" />
                   Attach screenshot
+                </button>
+              )}
+            </div>
+
+            {/* Paywall image upload */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                Paywall Screenshot <span className="text-gray-400 font-normal">(optional — will be saved and displayed in the account)</span>
+              </label>
+              <input ref={paywallFileInputRef} type="file" accept="image/*" onChange={handlePaywallImage} className="hidden" />
+              {paywallImage ? (
+                <div className="flex items-center gap-3 p-2 border border-violet-200 rounded-xl bg-violet-50/50">
+                  <img src={paywallImage.preview} alt="paywall preview" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  <p className="text-xs text-gray-600 flex-1 truncate">{paywallImage.name}</p>
+                  <button onClick={() => { setPaywallImage(null); if (paywallFileInputRef.current) paywallFileInputRef.current.value = ''; }}
+                    className="text-gray-400 hover:text-red-500 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => paywallFileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-violet-300 hover:text-violet-500 hover:bg-violet-50/30 transition-all">
+                  <ImagePlus className="w-4 h-4" />
+                  Attach paywall screenshot
                 </button>
               )}
             </div>
@@ -527,7 +565,7 @@ export function AccountsPage() {
       {showAddModal && (
         <AddCompanyModal
           onClose={() => setShowAddModal(false)}
-          onResearching={(company, domain) => {
+          onResearching={(company, domain, paywallPreview) => {
             const id = `researching-${Date.now()}`;
             addAccounts([{
               id,
@@ -547,6 +585,7 @@ export function AccountsPage() {
               status: '',
               logoColor: '#7c3aed',
               enrichmentStatus: 'enriching',
+              paywallScreenshot: paywallPreview,
             }]);
           }}
         />

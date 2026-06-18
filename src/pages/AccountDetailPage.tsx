@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Download, RefreshCw,
-  Calendar, MessageSquare, Briefcase, ChevronDown, ChevronRight, ExternalLink
+  Calendar, MessageSquare, Briefcase, ChevronDown, ChevronRight, ExternalLink,
+  Newspaper, TrendingUp, LayoutGrid
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -233,6 +234,109 @@ export function AccountDetailPage() {
               </CardContent>
             </Card>
 
+            {/* News card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Newspaper className="w-4 h-4 text-violet-500" />
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">News</h2>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {(!account.news || account.news.length === 0) ? (
+                  <p className="text-sm text-gray-400 text-center py-4">No news data yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {account.news.map((item, i) => (
+                      <div key={i} className="space-y-1">
+                        <p className="text-xs text-gray-400">{item.date}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                          {item.url && (
+                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-indigo-600 flex-shrink-0">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                        {item.source && (
+                          <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">{item.source}</span>
+                        )}
+                        {item.summary && (
+                          <p className="text-xs text-gray-500 leading-relaxed">{item.summary}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Paywall Analysis card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4 text-violet-500" />
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Paywall Analysis</h2>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!account.paywallScreenshot && !account.paywallAnalysis ? (
+                  <p className="text-sm text-gray-400 text-center py-4">No paywall data yet — upload a screenshot when adding the company</p>
+                ) : (
+                  <div className="space-y-4">
+                    {account.paywallScreenshot && (
+                      <img
+                        src={account.paywallScreenshot}
+                        alt="Paywall screenshot"
+                        className="w-full rounded-xl max-h-64 object-contain bg-gray-50"
+                      />
+                    )}
+                    {account.paywallAnalysis && (
+                      <div className="space-y-3">
+                        <span className="inline-block px-2.5 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-semibold">
+                          {account.paywallAnalysis.paywall_type}
+                        </span>
+                        {account.paywallAnalysis.key_observations.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Key Observations</p>
+                            <ul className="space-y-1">
+                              {account.paywallAnalysis.key_observations.map((obs, i) => (
+                                <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
+                                  <span className="text-gray-300 mt-0.5">•</span>{obs}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {account.paywallAnalysis.monetization_stack.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Monetization Stack</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {account.paywallAnalysis.monetization_stack.map((item, i) => (
+                                <span key={i} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs">{item}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {account.paywallAnalysis.opportunities.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Opportunities</p>
+                            <ul className="space-y-1">
+                              {account.paywallAnalysis.opportunities.map((opp, i) => (
+                                <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
+                                  <span className="text-gray-300 mt-0.5">•</span>{opp}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
           </div>
 
           {/* Right col */}
@@ -256,6 +360,40 @@ export function AccountDetailPage() {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Investment card */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-violet-500" />
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Investment</h2>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {(!account.investmentHistory || account.investmentHistory.length === 0) ? (
+                  <p className="text-sm text-gray-400 text-center py-2">No investment data yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {account.investmentHistory.map((round, i) => (
+                      <div key={i} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-800">{round.round}</p>
+                          <p className="text-xs text-gray-400">{round.date}</p>
+                        </div>
+                        <p className="text-sm font-bold text-gray-900">{round.amount}</p>
+                        {round.investors.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {round.investors.map((inv, j) => (
+                              <span key={j} className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">{inv}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -367,6 +505,25 @@ export function AccountDetailPage() {
                       </div>
                     </div>
                   </div>
+                  {person.recentPosts && person.recentPosts.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <MessageSquare className="w-3 h-3 text-gray-400" />
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Recent Posts</p>
+                      </div>
+                      <div className="space-y-2">
+                        {person.recentPosts.slice(0, 3).map((post, i) => (
+                          <div key={i} className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-gray-400">{post.date}</span>
+                              <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">{post.platform}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 line-clamp-2">{post.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </Card>
                 </Link>
               ))}

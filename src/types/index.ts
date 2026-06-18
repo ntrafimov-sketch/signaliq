@@ -78,6 +78,10 @@ export interface Account {
   adIntelligence?: AdIntelligence;
   revenueHistory?: Array<{ date: string; ios: number; android: number }>;
   downloadHistory?: Array<{ date: string; ios: number; android: number }>;
+  news?: Array<{ date: string; title: string; source?: string; url?: string; summary?: string }>;
+  investmentHistory?: Array<{ round: string; amount: string; investors: string[]; date: string }>;
+  paywallAnalysis?: { paywall_type: string; key_observations: string[]; monetization_stack: string[]; opportunities: string[] };
+  paywallScreenshot?: string; // base64 data URL
 }
 
 export interface CareerEntry {
@@ -104,6 +108,7 @@ export interface Person {
   influence: 'High' | 'Medium' | 'Low';
   avatarColor: string;
   careerTrack?: CareerEntry[];
+  recentPosts?: Array<{ date: string; platform: string; content: string; url?: string }>;
 }
 
 export interface AdIntelligence {
