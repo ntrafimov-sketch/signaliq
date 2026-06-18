@@ -36,10 +36,7 @@ def trigger_claude(data: dict) -> None:
 -- Remember which app is currently in front
 set prevApp to (path to frontmost application as text)
 
--- Find Claude Desktop window (not Claude Code)
--- We target by bundle ID to avoid hitting Claude Code CLI wrapper
 tell application "{CLAUDE_APP}"
-    -- Open a new chat without stealing focus permanently
     activate
 end tell
 
@@ -47,9 +44,14 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Cmd+N opens new conversation
+        -- Switch to Chat mode (click Chat button in toolbar)
+        try
+            click button "Chat" of window 1
+            delay 0.3
+        end try
+        -- Open new conversation
         keystroke "n" using command down
-        delay 0.5
+        delay 0.6
         -- Paste the prompt
         set the clipboard to "{prompt_escaped}"
         keystroke "v" using command down
@@ -61,7 +63,7 @@ end tell
 
 delay 0.3
 
--- Switch back to the app that was in front before
+-- Switch back to previous app
 try
     tell application (prevApp) to activate
 end try
