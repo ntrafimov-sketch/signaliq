@@ -1,12 +1,20 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Account, Signal, List, ApiKeys } from '../types';
-import { mockLists } from '../data/mockData';
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  password?: string;
+}
+
 
 interface AppState {
   accounts: Account[];
   lists: List[];
   apiKeys: ApiKeys;
+  profile: UserProfile;
   isUploading: boolean;
   uploadSuccess: { count: number; duration: number } | null;
 
@@ -22,6 +30,7 @@ interface AppState {
   removeList: (id: string) => void;
 
   setApiKeys: (keys: Partial<ApiKeys>) => void;
+  setProfile: (profile: Partial<UserProfile>) => void;
 
   setUploading: (uploading: boolean) => void;
   setUploadSuccess: (result: { count: number; duration: number } | null) => void;
@@ -33,7 +42,8 @@ export const useStore = create<AppState>()(
   persist(
     (set) => ({
       accounts: [],
-      lists: mockLists,
+      lists: [],
+      profile: { name: 'Nikita Trafimov', email: 'ntrafimov@adapty.io' },
       apiKeys: {
         amplemarket: import.meta.env.VITE_AMPLEMARKET_API_KEY || '',
         demandbase: import.meta.env.VITE_DEMANDBASE_API_KEY || '',
@@ -76,6 +86,10 @@ export const useStore = create<AppState>()(
         set((state) => ({
           apiKeys: { ...state.apiKeys, ...keys },
         })),
+      setProfile: (profile) =>
+        set((state) => ({
+          profile: { ...state.profile, ...profile },
+        })),
 
       setUploading: (isUploading) => set({ isUploading }),
       setUploadSuccess: (uploadSuccess) => set({ uploadSuccess }),
@@ -94,6 +108,8 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         accounts: state.accounts,
         apiKeys: state.apiKeys,
+        profile: state.profile,
+        lists: state.lists,
       }),
     }
   )
