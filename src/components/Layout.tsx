@@ -68,7 +68,7 @@ export function Layout({ children }: LayoutProps) {
               <Zap className="w-4 h-4 text-white fill-white" />
             </div>
             {!collapsed && (
-              <span className="font-bold text-gray-900 text-base tracking-tight truncate">SignalIQ</span>
+              <span className="font-extrabold text-gray-900 text-[15px] tracking-tight truncate">SignalIQ</span>
             )}
           </Link>
           <button
@@ -90,7 +90,7 @@ export function Layout({ children }: LayoutProps) {
                 to={item.path}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all',
                   collapsed && 'justify-center px-2',
                   isActive
                     ? 'bg-gradient-to-r from-violet-600 to-violet-700 text-white shadow-sm shadow-violet-200'
@@ -110,7 +110,7 @@ export function Layout({ children }: LayoutProps) {
             to="/settings"
             title={collapsed ? 'Settings' : undefined}
             className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all',
               collapsed && 'justify-center px-2',
               location.pathname === '/settings'
                 ? 'bg-gradient-to-r from-violet-600 to-violet-700 text-white shadow-sm shadow-violet-200'
@@ -170,7 +170,7 @@ export function Layout({ children }: LayoutProps) {
         {/* Top header */}
         <header className="bg-white/80 backdrop-blur-sm border-b border-violet-100 sticky top-0 z-20">
           <div className="px-6 h-14 flex items-center justify-between">
-            <h1 className="text-base font-bold text-gray-900">{pageTitle}</h1>
+            <h1 className="text-[15px] font-bold text-gray-900 tracking-tight">{pageTitle}</h1>
             <button className="p-2 rounded-xl text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors relative">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
