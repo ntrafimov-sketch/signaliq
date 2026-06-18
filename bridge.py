@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Run with: python3 bridge.py
 """
 SignalIQ Bridge — triggers Claude Desktop from the dashboard form.
 Run once: python bridge.py
