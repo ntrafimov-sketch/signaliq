@@ -272,13 +272,15 @@ export function PersonDetailPage() {
       </div>
 
       {/* Recent Posts */}
-      {person.recentPosts && person.recentPosts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Recent Posts</h2>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {person.recentPosts.map((post: { date: string; platform: string; content: string; url?: string }, i: number) => (
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Recent Posts</h2>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(!person.recentPosts || person.recentPosts.length === 0) ? (
+            <p className="text-sm text-gray-400 text-center py-4">No recent posts yet</p>
+          ) : (
+            person.recentPosts.map((post: { date: string; platform: string; content: string; url?: string }, i: number) => (
               <div key={i} className="flex items-start gap-3 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
@@ -294,10 +296,10 @@ export function PersonDetailPage() {
                   </a>
                 )}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       {/* Outreach sequence */}
       {(messages.length > 0 || generating) && (
