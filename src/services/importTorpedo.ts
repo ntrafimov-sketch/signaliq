@@ -13,15 +13,6 @@ function fmt(n: number) {
   return n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${Math.round(n / 1_000)}K` : `$${Math.round(n)}`;
 }
 
-// Normalize revenue_history data — handles both flat array and {store, records:[]} formats
-function extractPoints(data: unknown): { date: string; revenue?: number; downloads?: number }[] {
-  if (Array.isArray(data)) return data;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const d = data as any;
-  if (d && Array.isArray(d.records)) return d.records;
-  return [];
-}
-
 export function importTorpedoJson(
   entries: TorpedoEntry[],
   accountId: string,
@@ -30,7 +21,6 @@ export function importTorpedoJson(
   const today = new Date().toISOString().split('T')[0];
   const signals: Signal[] = [];
   const updates: Partial<Account> = {};
-  // Accumulate revenue across stores for MTR and charts
   const mtrByStore: Record<string, number> = {};
   const revByDate = new Map<string, { ios: number; android: number }>();
   const dlByDate = new Map<string, { ios: number; android: number }>();
@@ -38,16 +28,21 @@ export function importTorpedoJson(
   for (const entry of entries) {
     if (!entry || !entry.type || entry.data === undefined) continue;
     switch (entry.type) {
+
       case 'company_intel': {
         const d = entry.data;
         updates.description = d.description || d.business_model || d.name;
         updates.hq = d.hq || d.location || '';
-        updates.employees = typeof d.headcount === 'number' ? d.headcount
-          : parseInt(String(d.headcount || '0').replace(/\D.*/, '')) || 0;
+        // employees: prefer numeric field, fallback to parsing string
+        updates.employees = typeof d.employees === 'number' ? d.employees
+          : typeof d.headcount === 'number' ? d.headcount
+          : parseInt(String(d.employees || d.headcount || '0').replace(/\D.*/, '')) || 0;
         updates.industry = d.industry || '';
-        updates.revenue = d.funding || (d.total_funding_usd
-          ? `${fmt(d.total_funding_usd)} raised` : '');
-        updates.status = d.amplemarket_account_status?.includes('customer') ? 'Customer' : (d.stage || 'Private');
+        // revenue: prefer actual revenue fields over funding
+        updates.revenue = d.actual_revenue_fy2024 || d.estimated_revenue || d.funding
+          || (d.total_funding_usd ? `${fmt(d.total_funding_usd)} raised` : '');
+        // status: prefer company type
+        updates.status = d.type || (d.amplemarket_account_status?.includes('customer') ? 'Customer' : (d.stage || 'Private'));
         updates.founded = d.founded ? String(d.founded) : (d.latest_round?.date?.slice(0, 4) || '');
         if (d.total_funding_usd || d.funding || d.latest_round) {
           signals.push({
@@ -62,67 +57,105 @@ export function importTorpedoJson(
         break;
       }
 
-      case 'revenue_history': {
-        const store: string = entry.data?.store || entry.store || 'ios';
+      case 'investments': {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const points = extractPoints(entry.data).filter((p: any) => !p.note?.includes('Partial'));
-        // Accumulate chart data
-        for (const p of points) {
-          const existing = revByDate.get(p.date) ?? { ios: 0, android: 0 };
-          if (store === 'ios') existing.ios = p.revenue || 0;
-          else existing.android = p.revenue || 0;
-          revByDate.set(p.date, existing);
+        const rounds = Array.isArray(entry.data) ? entry.data : [];
+        updates.investmentHistory = rounds.map((r: any) => ({
+          round: r.round || r.stage || 'Investment',
+          amount: r.amount_usd ? fmt(r.amount_usd) : (r.amount || ''),
+          investors: Array.isArray(r.investors) ? r.investors : (r.lead_investor ? [r.lead_investor] : []),
+          date: r.date || '',
+        }));
+        break;
+      }
+
+      case 'revenue_history': {
+        // New format: flat array with store field per record
+        // Old format: entry.store + flat array without store field
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawData: any[] = Array.isArray(entry.data) ? entry.data : [];
+        const entryStore: string = entry.store || '';
+
+        // Group by store
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const byStore: Record<string, any[]> = {};
+        for (const p of rawData) {
+          const store = p.store || entryStore || 'ios';
+          if (!byStore[store]) byStore[store] = [];
+          byStore[store].push(p);
         }
-        if (points.length > 0) {
-          const lastRev = (points[points.length - 1].revenue as number) || 0;
-          if (lastRev > 0) mtrByStore[store] = lastRev;
-        }
-        if (points.length >= 4) {
-          const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-          const revs = points.map((p: { revenue?: number }) => p.revenue || 0);
-          const recent = avg(revs.slice(-3));
-          const prior = avg(revs.slice(-6, -3));
-          const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
-          const abs = Math.abs(pct);
-          const type = pct > 10 ? 'Revenue Increase' : pct < -10 ? 'Revenue Decrease' : 'Revenue Plateau';
-          signals.push({
-            id: genId(), accountId, accountName: companyName,
-            type, category: 'Revenue', source: 'AppMagic',
-            date: today, confidence: 'High', impact: abs > 20 ? 'High' : 'Medium',
-            title: type === 'Revenue Plateau'
-              ? `${store.toUpperCase()} revenue plateau ±${abs}% MoM`
-              : `${store.toUpperCase()} revenue ${pct > 0 ? '+' : ''}${pct}% MoM`,
-            description: `Last month: ${fmt(revs[revs.length - 1])}`,
-          });
+
+        for (const [store, points] of Object.entries(byStore)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const filtered = points.filter((p: any) => !p.note?.includes('Partial'));
+          for (const p of filtered) {
+            const existing = revByDate.get(p.date) ?? { ios: 0, android: 0 };
+            if (store === 'ios') existing.ios = p.revenue || 0;
+            else existing.android = p.revenue || 0;
+            revByDate.set(p.date, existing);
+          }
+          if (filtered.length > 0) {
+            const lastRev = (filtered[filtered.length - 1].revenue as number) || 0;
+            if (lastRev > 0) mtrByStore[store] = lastRev;
+          }
+          if (filtered.length >= 4) {
+            const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+            const revs = filtered.map((p: { revenue?: number }) => p.revenue || 0);
+            const recent = avg(revs.slice(-3));
+            const prior = avg(revs.slice(-6, -3));
+            const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
+            const abs = Math.abs(pct);
+            const type = pct > 10 ? 'Revenue Increase' : pct < -10 ? 'Revenue Decrease' : 'Revenue Plateau';
+            signals.push({
+              id: genId(), accountId, accountName: companyName,
+              type, category: 'Revenue', source: 'AppMagic',
+              date: today, confidence: 'High', impact: abs > 20 ? 'High' : 'Medium',
+              title: type === 'Revenue Plateau'
+                ? `${store.toUpperCase()} revenue plateau ±${abs}% MoM`
+                : `${store.toUpperCase()} revenue ${pct > 0 ? '+' : ''}${pct}% MoM`,
+              description: `Last month: ${fmt(revs[revs.length - 1])}`,
+            });
+          }
         }
         break;
       }
 
       case 'download_history': {
-        const store: string = entry.data?.store || 'ios';
-        const points = extractPoints(entry.data);
-        // Accumulate chart data
-        for (const p of points) {
-          const existing = dlByDate.get(p.date) ?? { ios: 0, android: 0 };
-          if (store === 'ios') existing.ios = p.downloads || 0;
-          else existing.android = p.downloads || 0;
-          dlByDate.set(p.date, existing);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawData: any[] = Array.isArray(entry.data) ? entry.data : [];
+        const entryStore: string = entry.store || '';
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const byStore: Record<string, any[]> = {};
+        for (const p of rawData) {
+          const store = p.store || entryStore || 'ios';
+          if (!byStore[store]) byStore[store] = [];
+          byStore[store].push(p);
         }
-        if (points.length >= 4) {
-          const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-          const vals = points.map((p: { downloads?: number }) => p.downloads || 0);
-          const recent = avg(vals.slice(-3));
-          const prior = avg(vals.slice(-6, -3));
-          const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
-          const abs = Math.abs(pct);
-          const type = pct > 10 ? 'Download Increase' : pct < -10 ? 'Download Decrease' : 'Download Plateau';
-          signals.push({
-            id: genId(), accountId, accountName: companyName,
-            type, category: 'Downloads', source: 'AppMagic',
-            date: today, confidence: 'High', impact: abs > 20 ? 'High' : 'Medium',
-            title: `${store.toUpperCase()} installs ${pct > 0 ? '+' : ''}${pct}% MoM`,
-            description: `Avg last 3 months: ${Math.round(recent).toLocaleString()} downloads/mo.`,
-          });
+
+        for (const [store, points] of Object.entries(byStore)) {
+          for (const p of points) {
+            const existing = dlByDate.get(p.date) ?? { ios: 0, android: 0 };
+            if (store === 'ios') existing.ios = p.downloads || 0;
+            else existing.android = p.downloads || 0;
+            dlByDate.set(p.date, existing);
+          }
+          if (points.length >= 4) {
+            const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+            const vals = points.map((p: { downloads?: number }) => p.downloads || 0);
+            const recent = avg(vals.slice(-3));
+            const prior = avg(vals.slice(-6, -3));
+            const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
+            const abs = Math.abs(pct);
+            const type = pct > 10 ? 'Download Increase' : pct < -10 ? 'Download Decrease' : 'Download Plateau';
+            signals.push({
+              id: genId(), accountId, accountName: companyName,
+              type, category: 'Downloads', source: 'AppMagic',
+              date: today, confidence: 'High', impact: abs > 20 ? 'High' : 'Medium',
+              title: `${store.toUpperCase()} installs ${pct > 0 ? '+' : ''}${pct}% MoM`,
+              description: `Avg last 3 months: ${Math.round(recent).toLocaleString()} downloads/mo.`,
+            });
+          }
         }
         break;
       }
@@ -246,7 +279,6 @@ export function importTorpedoJson(
             description: `First touch: ${totals.first_touch_date || 'unknown'} · Last touch: ${totals.last_touch_date || 'unknown'}`,
           });
         }
-        // HubSpot contacts with title support
         const contacts = (d.contacts_summary || []) as { name: string; email?: string; title?: string; status?: string; conversion_count?: number }[];
         if (contacts.length) {
           const people: Person[] = contacts.map((c, i) => ({
@@ -261,7 +293,6 @@ export function importTorpedoJson(
           }));
           updates.people = [...(updates.people || []), ...people];
         }
-        // Content timeline — all items
         const timeline = (d.content_timeline || []) as { date: string; person: string; event: string; source?: string }[];
         for (const item of timeline) {
           signals.push({
@@ -276,11 +307,12 @@ export function importTorpedoJson(
       }
 
       case 'signals': {
-        for (const s of entry.data as { signal: string; implication?: string; relevance?: string; detail?: string; why_now?: string }[]) {
+        for (const s of entry.data as { signal: string; priority?: string; implication?: string; relevance?: string; detail?: string; why_now?: string }[]) {
+          const impact = s.priority === 'HIGH' ? 'High' : s.priority === 'MEDIUM' ? 'Medium' : 'Low';
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Post mentioned specific keywords', category: 'Social', source: 'Research',
-            date: today, confidence: 'High', impact: 'Medium',
+            date: today, confidence: 'High', impact: impact as 'High' | 'Medium' | 'Low',
             title: s.signal,
             description: s.detail || s.implication || s.relevance || s.why_now || '',
           });
@@ -298,12 +330,26 @@ export function importTorpedoJson(
           location?: string;
           overview?: { current_title?: string; email?: string; location?: string; bio?: string };
           career_track?: CareerEntry[];
+          what_to_pitch?: { likely_priorities?: string; recommended_angle?: string };
+          linkedin_posts?: {
+            posts?: Array<{ date: string; url?: string; content: string; likes?: number; comments?: number }> | null;
+          };
         }[]).map((c, i) => {
           const title = c.title || c.overview?.current_title || '';
           const email = c.email || c.overview?.email || undefined;
           const location = c.location || c.overview?.location || '';
           const linkedin = c.linkedin || c.linkedin_url || '';
           const bio = c.overview?.bio;
+
+          // Map linkedin_posts.posts → recentPosts
+          const rawPosts = c.linkedin_posts?.posts;
+          const recentPosts = Array.isArray(rawPosts) ? rawPosts.map(p => ({
+            date: p.date,
+            platform: 'LinkedIn',
+            content: p.content,
+            url: p.url,
+          })) : undefined;
+
           return {
             id: genId('person'), accountId,
             name: c.name, title, company: companyName,
@@ -313,28 +359,82 @@ export function importTorpedoJson(
             influence: guessInfluence(title) as 'High' | 'Medium' | 'Low',
             avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
             careerTrack: c.career_track,
+            recentPosts,
           };
         });
         updates.people = [...(updates.people || []), ...people];
         break;
       }
 
+      case 'news': {
+        updates.news = (entry.data as {
+          headline?: string;
+          title?: string;
+          date: string;
+          source?: string;
+          summary?: string;
+          url?: string;
+        }[]).map(item => ({
+          date: item.date,
+          title: item.headline || item.title || '',
+          source: item.source,
+          url: item.url,
+          summary: item.summary,
+        }));
+        break;
+      }
+
+      case 'paywall_analysis': {
+        const d = entry.data;
+        // Build key_observations from screen_inventory + executive_summary
+        const keyObs: string[] = [];
+        if (d.executive_summary) keyObs.push(d.executive_summary);
+        if (Array.isArray(d.screen_inventory)) keyObs.push(...d.screen_inventory.slice(0, 5));
+
+        // Opportunities from recommendations array
+        const opportunities: string[] = Array.isArray(d.recommendations)
+          ? d.recommendations.map((r: { priority?: string; recommendation?: string; rationale?: string }) =>
+              `[${r.priority || 'MED'}] ${r.recommendation || ''}${r.rationale ? ` — ${r.rationale.slice(0, 120)}` : ''}`
+            )
+          : [];
+
+        // Monetization stack from torpedo_strategy_connection or screen_inventory hints
+        const monetizationStack: string[] = [];
+        if (d.app_name) monetizationStack.push(d.app_name);
+        if (d.screen_type) monetizationStack.push(d.screen_type);
+
+        updates.paywallAnalysis = {
+          paywall_type: d.screen_type || d.paywall_type || '',
+          key_observations: keyObs,
+          monetization_stack: monetizationStack,
+          opportunities,
+        };
+        break;
+      }
+
       case 'strategy': {
         const d = entry.data;
-        if (d.situation_summary) updates.whyMatters = d.situation_summary;
-        const angles = (d.angles || []) as { angle: string; detail?: string; rationale?: string; pitch_framing?: string }[];
+        // whyMatters from account_status + icp_fit + timing_quality
+        const whyParts = [];
+        if (d.icp_fit) whyParts.push(`ICP Fit: ${d.icp_fit}`);
+        if (d.timing_quality) whyParts.push(`Timing: ${d.timing_quality}`);
+        if (d.account_status) whyParts.push(d.account_status);
+        if (d.situation_summary) whyParts.push(d.situation_summary);
+        if (whyParts.length) updates.whyMatters = whyParts.join(' · ');
+
+        const angles = (d.angles || []) as { angle: string; strength?: string; detail?: string; rationale?: string; pitch_framing?: string; hook?: string }[];
         if (angles.length) {
-          updates.whyKeywords = angles.map(a => a.angle.split(' ').slice(0, 3).join(' '));
+          updates.whyKeywords = angles.map(a => a.angle.split(' ').slice(0, 4).join(' '));
         }
-        if (angles.length || d.situation_summary) {
-          const top = angles[0];
-          updates.opportunitySummary = {
-            businessTrigger: d.situation_summary || '',
-            likelyPriorities: top ? (top.rationale || top.detail || '') : '',
-            potentialPainPoints: d.caution || (d.cautions as string[] | undefined)?.slice(0, 2).join(' ') || '',
-            recommendedAngle: top ? `${top.angle}: ${(top.rationale || top.detail || top.pitch_framing || '').slice(0, 200)}` : '',
-          };
-        }
+
+        const top = angles[0];
+        const second = angles[1];
+        updates.opportunitySummary = {
+          businessTrigger: top ? (top.angle || '') : (d.situation_summary || ''),
+          likelyPriorities: top ? (top.rationale || top.detail || top.hook || '') : '',
+          potentialPainPoints: second ? (second.rationale || second.detail || second.hook || '') : (d.caution || ''),
+          recommendedAngle: d.recommended_sequence || (top ? `${top.angle}: ${(top.hook || top.rationale || top.pitch_framing || '').slice(0, 300)}` : ''),
+        };
         break;
       }
     }
@@ -356,6 +456,17 @@ export function importTorpedoJson(
   const totalMTR = Object.values(mtrByStore).reduce((a, b) => a + b, 0);
   if (totalMTR > 0) {
     updates.lastMonthRevenue = `${fmt(totalMTR)}/mo`;
+  }
+
+  // Deduplicate people: contacts (amplemarket) takes priority over hubspot
+  if (updates.people && updates.people.length > 0) {
+    const seen = new Set<string>();
+    updates.people = updates.people.filter(p => {
+      const key = p.name.toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   const highImpact = signals.filter(s => s.impact === 'High').length;
