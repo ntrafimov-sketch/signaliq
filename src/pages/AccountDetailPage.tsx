@@ -95,7 +95,9 @@ export function AccountDetailPage() {
     .sort(byDate);
   const hubspotEngagement = account.signals
     .filter((s: Signal) => s.source === 'HubSpot' && s.type === 'Webinar Visited');
-  const amplemarketPeople = (account.people ?? []).filter(p => p.source !== 'hubspot');
+  // Show contacts from research (amplemarket) — if none, show all people
+  const researchPeople = (account.people ?? []).filter(p => p.source === 'amplemarket');
+  const amplemarketPeople = researchPeople.length > 0 ? researchPeople : (account.people ?? []).filter(p => p.source !== 'hubspot');
 
   return (
     <div className="space-y-5">

@@ -458,10 +458,16 @@ export function importTorpedoJson(
     updates.lastMonthRevenue = `${fmt(totalMTR)}/mo`;
   }
 
-  // Deduplicate people: contacts (amplemarket) takes priority over hubspot
+  // Deduplicate people: amplemarket/contacts takes priority over hubspot
   if (updates.people && updates.people.length > 0) {
+    // Sort so amplemarket comes before hubspot
+    const sorted = [...updates.people].sort((a, b) => {
+      if (a.source === 'amplemarket' && b.source !== 'amplemarket') return -1;
+      if (a.source !== 'amplemarket' && b.source === 'amplemarket') return 1;
+      return 0;
+    });
     const seen = new Set<string>();
-    updates.people = updates.people.filter(p => {
+    updates.people = sorted.filter(p => {
       const key = p.name.toLowerCase().trim();
       if (seen.has(key)) return false;
       seen.add(key);
