@@ -333,6 +333,7 @@ export function AccountsPage() {
             downloadHistory: updates.downloadHistory,
             news: updates.news,
             products: updates.products,
+            orgChart: updates.orgChart,
             investmentHistory: updates.investmentHistory,
             paywallAnalysis: updates.paywallAnalysis,
             paywallScreenshot: updates.paywallScreenshot,

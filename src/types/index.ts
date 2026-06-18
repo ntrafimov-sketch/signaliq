@@ -83,6 +83,12 @@ export interface Account {
   paywallAnalysis?: { paywall_type: string; key_observations: string[]; monetization_stack: string[]; opportunities: string[] };
   paywallScreenshot?: string;
   products?: Array<{ app_name: string; platform: string; has_in_app_purchases?: boolean | null; store_url_ios?: string; store_url_android?: string; description?: string }>;
+  orgChart?: {
+    c_level?: Array<{ name: string; title: string; reports_to?: string | null }>;
+    vp_director?: Array<{ name: string; title: string; reports_to?: string | null }>;
+    manager_ic?: Array<{ name: string; title: string; reports_to?: string | null }>;
+    unknown?: Array<{ name: string; title: string; reports_to?: string | null }>;
+  };
 }
 
 export interface CareerEntry {

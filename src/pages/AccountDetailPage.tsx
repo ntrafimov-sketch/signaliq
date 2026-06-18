@@ -52,6 +52,7 @@ function ImpactDots({ level }: { level: 'High' | 'Medium' | 'Low' }) {
 }
 
 const SIGNAL_CATEGORIES: Array<SignalCategory | 'All'> = ['All', 'Revenue', 'Competitive', 'Content', 'Social', 'Hiring'];
+const AVATAR_PALETTE = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6', '#10b981'];
 
 export function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -62,6 +63,7 @@ export function AccountDetailPage() {
   const [expandedDept, setExpandedDept] = useState<string | null>('Engineering');
   const [signalCategory, setSignalCategory] = useState<SignalCategory | 'All'>('All');
   const [showJsonPaste, setShowJsonPaste] = useState(false);
+  const [peopleView, setPeopleView] = useState<'contacts' | 'org'>('contacts');
   const [jsonPasteError, setJsonPasteError] = useState('');
   const jsonTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -589,7 +591,76 @@ export function AccountDetailPage() {
 
       {activeTab === 'People' && (
         <div className="space-y-4">
-          {amplemarketPeople.length === 0 ? (
+          {/* View toggle */}
+          {account.orgChart && (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPeopleView('contacts')}
+                className={cn('px-3 py-1.5 rounded-lg text-sm font-medium transition-colors', peopleView === 'contacts' ? 'bg-violet-600 text-white' : 'bg-white text-gray-500 border border-gray-200 hover:border-violet-300')}>
+                Contacts
+              </button>
+              <button onClick={() => setPeopleView('org')}
+                className={cn('px-3 py-1.5 rounded-lg text-sm font-medium transition-colors', peopleView === 'org' ? 'bg-violet-600 text-white' : 'bg-white text-gray-500 border border-gray-200 hover:border-violet-300')}>
+                Org Chart
+              </button>
+            </div>
+          )}
+
+          {/* Org Chart view */}
+          {peopleView === 'org' && account.orgChart && (() => {
+            const org = account.orgChart!;
+            const sections = [
+              { label: 'C-Level', people: org.c_level ?? [], color: 'bg-violet-100 text-violet-700 border-violet-200' },
+              { label: 'VP / Director', people: org.vp_director ?? [], color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
+              { label: 'Manager / IC', people: org.manager_ic ?? [], color: 'bg-gray-50 text-gray-600 border-gray-100' },
+              { label: 'Other', people: org.unknown ?? [], color: 'bg-gray-50 text-gray-500 border-gray-100' },
+            ].filter(s => s.people.length > 0);
+
+            return (
+              <div className="space-y-5">
+                {sections.map(section => (
+                  <div key={section.label}>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{section.label}</p>
+                    <div className="space-y-2">
+                      {section.people.map((p, i) => {
+                        const linked = (account.people ?? []).find(person =>
+                          person.name.toLowerCase().includes(p.name.split(' ')[0].toLowerCase()) ||
+                          p.name.toLowerCase().includes(person.name.split(' ')[0].toLowerCase())
+                        );
+                        return (
+                          <div key={i} className={cn('flex items-center gap-3 px-4 py-3 rounded-xl border', section.color)}>
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                              style={{ background: AVATAR_PALETTE[i % AVATAR_PALETTE.length] }}>
+                              {p.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              {linked ? (
+                                <Link to={`/accounts/${account.id}/people/${linked.id}`}
+                                  className="text-sm font-semibold text-gray-900 hover:text-violet-600 transition-colors">
+                                  {p.name}
+                                </Link>
+                              ) : (
+                                <p className="text-sm font-semibold text-gray-900">{p.name}</p>
+                              )}
+                              <p className="text-xs text-gray-500 truncate">{p.title}</p>
+                            </div>
+                            {p.reports_to && (
+                              <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
+                                <span className="hidden sm:inline">→</span>
+                                <span className="hidden sm:inline truncate max-w-32">{p.reports_to}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Contacts view */}
+          {peopleView === 'contacts' && (amplemarketPeople.length === 0 ? (
             <Card>
               <div className="px-5 py-10 text-center text-sm text-gray-400">No Amplemarket contacts found</div>
             </Card>
@@ -647,7 +718,7 @@ export function AccountDetailPage() {
                 </Link>
               ))}
             </div>
-          )}
+          ))}
         </div>
       )}
 

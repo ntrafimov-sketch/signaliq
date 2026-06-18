@@ -160,6 +160,11 @@ export function importTorpedoJson(
         break;
       }
 
+      case 'org_chart': {
+        updates.orgChart = entry.data;
+        break;
+      }
+
       case 'products': {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         updates.products = (Array.isArray(entry.data) ? entry.data : []).map((p: any) => ({
