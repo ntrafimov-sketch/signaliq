@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
+import { MetricChart } from '../components/MetricChart';
 import { SignalCategoryBadge, ConfidenceBadge } from '../components/SignalBadge';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
@@ -208,13 +209,29 @@ export function AccountDetailPage() {
                   { label: 'Pain Points', text: account.opportunitySummary?.potentialPainPoints ?? '', highlight: false },
                   { label: 'Recommended Angle', text: account.opportunitySummary?.recommendedAngle ?? '', highlight: true },
                 ].map(item => (
-                  <div key={item.label} className={cn('rounded-lg p-3 text-sm', item.highlight ? 'bg-indigo-50 border border-indigo-100' : 'bg-gray-50 border border-gray-100')}>
-                    <p className={cn('font-semibold mb-1 text-xs uppercase tracking-wide', item.highlight ? 'text-indigo-700' : 'text-gray-500')}>{item.label}</p>
-                    <p className={cn('leading-relaxed', item.highlight ? 'text-indigo-800' : 'text-gray-700')}>{item.text || 'No data available.'}</p>
+                  <div key={item.label} className={cn('rounded-lg p-3 text-sm', item.highlight ? 'bg-violet-50 border border-violet-100' : 'bg-gray-50 border border-gray-100')}>
+                    <p className={cn('font-semibold mb-1 text-xs uppercase tracking-wide', item.highlight ? 'text-violet-700' : 'text-gray-500')}>{item.label}</p>
+                    <p className={cn('leading-relaxed', item.highlight ? 'text-violet-800' : 'text-gray-700')}>{item.text || 'No data available.'}</p>
                   </div>
                 ))}
               </CardContent>
             </Card>
+
+            {/* Charts */}
+            {account.revenueHistory && account.revenueHistory.length > 1 && (
+              <Card>
+                <CardContent>
+                  <MetricChart data={account.revenueHistory} type="revenue" title="iOS + Android Revenue" />
+                </CardContent>
+              </Card>
+            )}
+            {account.downloadHistory && account.downloadHistory.length > 1 && (
+              <Card>
+                <CardContent>
+                  <MetricChart data={account.downloadHistory} type="downloads" title="iOS + Android Downloads" />
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right col */}

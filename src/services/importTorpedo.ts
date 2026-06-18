@@ -30,8 +30,10 @@ export function importTorpedoJson(
   const today = new Date().toISOString().split('T')[0];
   const signals: Signal[] = [];
   const updates: Partial<Account> = {};
-  // Accumulate revenue across stores for MTR
+  // Accumulate revenue across stores for MTR and charts
   const mtrByStore: Record<string, number> = {};
+  const revByDate = new Map<string, { ios: number; android: number }>();
+  const dlByDate = new Map<string, { ios: number; android: number }>();
 
   for (const entry of entries) {
     if (!entry || !entry.type || entry.data === undefined) continue;
@@ -64,6 +66,13 @@ export function importTorpedoJson(
         const store: string = entry.data?.store || entry.store || 'ios';
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const points = extractPoints(entry.data).filter((p: any) => !p.note?.includes('Partial'));
+        // Accumulate chart data
+        for (const p of points) {
+          const existing = revByDate.get(p.date) ?? { ios: 0, android: 0 };
+          if (store === 'ios') existing.ios = p.revenue || 0;
+          else existing.android = p.revenue || 0;
+          revByDate.set(p.date, existing);
+        }
         if (points.length > 0) {
           const lastRev = (points[points.length - 1].revenue as number) || 0;
           if (lastRev > 0) mtrByStore[store] = lastRev;
@@ -92,6 +101,13 @@ export function importTorpedoJson(
       case 'download_history': {
         const store: string = entry.data?.store || 'ios';
         const points = extractPoints(entry.data);
+        // Accumulate chart data
+        for (const p of points) {
+          const existing = dlByDate.get(p.date) ?? { ios: 0, android: 0 };
+          if (store === 'ios') existing.ios = p.downloads || 0;
+          else existing.android = p.downloads || 0;
+          dlByDate.set(p.date, existing);
+        }
         if (points.length >= 4) {
           const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
           const vals = points.map((p: { downloads?: number }) => p.downloads || 0);
@@ -322,6 +338,18 @@ export function importTorpedoJson(
         break;
       }
     }
+  }
+
+  // Save chart time-series
+  if (revByDate.size > 0) {
+    updates.revenueHistory = Array.from(revByDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
+  }
+  if (dlByDate.size > 0) {
+    updates.downloadHistory = Array.from(dlByDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
   }
 
   // Sum MTR across all stores

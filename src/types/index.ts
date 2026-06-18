@@ -76,6 +76,8 @@ export interface Account {
   };
   departmentIntel?: DepartmentIntelligence[];
   adIntelligence?: AdIntelligence;
+  revenueHistory?: Array<{ date: string; ios: number; android: number }>;
+  downloadHistory?: Array<{ date: string; ios: number; android: number }>;
 }
 
 export interface CareerEntry {
