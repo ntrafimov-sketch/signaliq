@@ -24,7 +24,7 @@ def trigger_claude(data: dict) -> None:
     if data.get("linkedin"):
         parts.append(f"LinkedIn: {data['linkedin']}")
 
-    prompt = "Research account — " + ", ".join(parts)
+    prompt = "/torpedo-research-agent " + ", ".join(parts)
 
     # Escape for AppleScript string
     prompt_escaped = prompt.replace("\\", "\\\\").replace('"', '\\"')
