@@ -19,16 +19,31 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6'
 
 function findParent(node: RawNode, all: TreeNode[]): TreeNode | null {
   const rt = (node.reports_to || '').toLowerCase().trim();
-  if (!rt || rt.startsWith('board') || rt === 'null') return null;
+  if (!rt || rt.startsWith('board') || rt === 'null' || rt === 'none') return null;
 
-  // Match by first name inside the reports_to string
+  // 1. Match by full name
+  for (const candidate of all) {
+    if (rt.includes(candidate.name.toLowerCase())) return candidate;
+  }
+  // 2. Match by last name (≥ 4 chars) — handles "Mina Nakicenovic" in reports_to
+  for (const candidate of all) {
+    const parts = candidate.name.toLowerCase().split(' ');
+    const lastName = parts[parts.length - 1];
+    if (lastName.length >= 4 && rt.includes(lastName)) return candidate;
+  }
+  // 3. Match by first name (≥ 3 chars)
   for (const candidate of all) {
     const firstName = candidate.name.split(' ')[0].toLowerCase();
-    if (firstName.length > 2 && rt.includes(firstName)) return candidate;
+    if (firstName.length >= 3 && rt.includes(firstName)) return candidate;
   }
-  // Match by title keyword
+  // 4. Match exact title (handles "CEO", "CTO", "CPO" etc.)
   for (const candidate of all) {
-    const titleWords = candidate.title.toLowerCase().split(/[\s/,()]+/).filter(w => w.length > 3);
+    const title = candidate.title.toLowerCase();
+    if (rt === title || rt.startsWith(title) || rt.includes(` ${title}`) ) return candidate;
+  }
+  // 5. Match by title words (≥ 3 chars) — handles "Engineering Manager", "CPO"
+  for (const candidate of all) {
+    const titleWords = candidate.title.toLowerCase().split(/[\s/,()]+/).filter(w => w.length >= 3);
     for (const word of titleWords) {
       if (rt.includes(word)) return candidate;
     }
