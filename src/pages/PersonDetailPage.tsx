@@ -16,18 +16,22 @@ import type { OutreachMessage, CareerEntry } from '../types';
 type TabType = 'All' | 'Email' | 'LinkedIn';
 
 function CompanyLogo({ company }: { company: string }) {
-  const [failed, setFailed] = useState(false);
+  const [stage, setStage] = useState(0);
   const domain = company.toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+inc$|\s+llc$|\s+corp$|\s+ltd$/,'')
     .trim()
     .replace(/\s+/g, '') + '.com';
-  if (!failed) {
+  const srcs = [
+    `https://logo.brandfetch.io/${domain}/icon`,
+    `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+  ];
+  if (stage < srcs.length) {
     return (
       <img
-        src={`https://logo.clearbit.com/${domain}`}
+        src={srcs[stage]}
         alt={company}
-        onError={() => setFailed(true)}
+        onError={() => setStage(s => s + 1)}
         className="w-8 h-8 rounded-lg object-contain bg-white border border-gray-100"
       />
     );

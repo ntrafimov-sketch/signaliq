@@ -32,14 +32,18 @@ function ScoreRing({ score, tier }: { score: number; tier: string }) {
 }
 
 function AccountLogo({ domain, name }: { domain: string; name: string }) {
-  const [failed, setFailed] = useState(false);
+  const [stage, setStage] = useState(0);
   const cleanDomain = domain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
-  if (!failed) {
+  const srcs = [
+    `https://logo.brandfetch.io/${cleanDomain}/icon`,
+    `https://www.google.com/s2/favicons?domain=${cleanDomain}&sz=64`,
+  ];
+  if (stage < srcs.length) {
     return (
       <img
-        src={`https://logo.clearbit.com/${cleanDomain}`}
+        src={srcs[stage]}
         alt={name}
-        onError={() => setFailed(true)}
+        onError={() => setStage(s => s + 1)}
         className="w-8 h-8 rounded-lg object-contain bg-white border border-gray-100 p-0.5"
       />
     );
