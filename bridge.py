@@ -9,6 +9,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import subprocess
 import sys
+import base64
+import os
+import tempfile
 
 PORT = 7337
 
@@ -32,8 +35,27 @@ def trigger_claude(data: dict) -> None:
     prompt = "/torpedo-research-agent " + ", ".join(parts)
     prompt_escaped = prompt.replace("\\", "\\\\").replace('"', '\\"')
 
+    # Save image to temp file if provided
+    img_path = None
+    if data.get("image_b64"):
+        img_data = base64.b64decode(data["image_b64"])
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tmp.write(img_data)
+        tmp.close()
+        img_path = tmp.name
+
+    # Build AppleScript — paste text prompt, then paste image if provided
+    img_block = ""
+    if img_path:
+        safe_path = img_path.replace("\\", "\\\\").replace('"', '\\"')
+        img_block = f"""
+        -- Paste image into the same message
+        delay 0.2
+        set the clipboard to (read (POSIX file "{safe_path}") as «class PNGf»)
+        keystroke "v" using command down
+        delay 0.3"""
+
     script = f"""
--- Remember which app is currently in front
 set prevApp to (path to frontmost application as text)
 
 tell application "{CLAUDE_APP}"
@@ -44,31 +66,30 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Switch to Chat mode (click Chat button in toolbar)
         try
             click button "Chat" of window 1
             delay 0.3
         end try
-        -- Open new conversation
         keystroke "n" using command down
         delay 0.6
-        -- Paste the prompt
         set the clipboard to "{prompt_escaped}"
-        keystroke "v" using command down
+        keystroke "v" using command down{img_block}
         delay 0.3
-        -- Send
         key code 36
     end tell
 end tell
 
 delay 0.3
 
--- Switch back to previous app
 try
     tell application (prevApp) to activate
 end try
 """
-    subprocess.run(["osascript", "-e", script], check=True)
+    try:
+        subprocess.run(["osascript", "-e", script], check=True)
+    finally:
+        if img_path and os.path.exists(img_path):
+            os.unlink(img_path)
 
 
 class Handler(BaseHTTPRequestHandler):

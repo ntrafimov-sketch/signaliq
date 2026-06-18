@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Globe, Users, ChevronUp, ChevronDown,
-  CheckCircle2, Loader2, Plus, Trash2, Sparkles, Copy, ExternalLink
+  CheckCircle2, Loader2, Plus, Trash2, Sparkles, Copy, ExternalLink, ImagePlus, X
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { CsvUpload } from '../components/CsvUpload';
@@ -54,6 +54,8 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
   const [bridgeOk, setBridgeOk] = useState<boolean | null>(null);
   const [form, setForm] = useState({ company: '', app_name: '', domain: '', linkedin: '' });
   const [status, setStatus] = useState<'idle' | 'launching' | 'done' | 'copied'>('idle');
+  const [image, setImage] = useState<{ b64: string; preview: string; name: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`${BRIDGE}/health`, { signal: AbortSignal.timeout(1500) })
@@ -70,6 +72,18 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
     return 'Research account — ' + parts.join(', ');
   };
 
+  const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const b64 = result.split(',')[1];
+      setImage({ b64, preview: result, name: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleLaunch = async () => {
     setStatus('launching');
     if (bridgeOk) {
@@ -77,7 +91,7 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
         const res = await fetch(`${BRIDGE}/trigger`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, image_b64: image?.b64 ?? null }),
         });
         if (res.ok) {
           setStatus('done');
@@ -153,6 +167,30 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
             {field('app_name', 'App Name', 'e.g. Endel: Sleep & Focus Music')}
             {field('domain', 'Company Domain', 'e.g. endel.io')}
             {field('linkedin', 'LinkedIn URL', 'e.g. linkedin.com/company/endel')}
+
+            {/* Image upload */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">
+                Screenshot <span className="text-gray-400 font-normal">(optional — App Store, LinkedIn, etc.)</span>
+              </label>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImage} className="hidden" />
+              {image ? (
+                <div className="flex items-center gap-3 p-2 border border-violet-200 rounded-xl bg-violet-50/50">
+                  <img src={image.preview} alt="preview" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                  <p className="text-xs text-gray-600 flex-1 truncate">{image.name}</p>
+                  <button onClick={() => { setImage(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="text-gray-400 hover:text-red-500 transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-violet-300 hover:text-violet-500 hover:bg-violet-50/30 transition-all">
+                  <ImagePlus className="w-4 h-4" />
+                  Attach screenshot
+                </button>
+              )}
+            </div>
 
             <button
               onClick={handleLaunch}
