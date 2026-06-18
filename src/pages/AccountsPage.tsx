@@ -229,7 +229,7 @@ export function AccountsPage() {
 
       {/* Upload loading */}
       {isUploading && (
-        <div className="bg-white rounded-xl border border-gray-200 p-8 flex flex-col items-center gap-3">
+        <div className="bg-white rounded-2xl border border-violet-100 shadow-sm shadow-violet-50 p-8 flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-gray-600 animate-spin" />
           <p className="text-sm text-gray-600 font-medium">Enriching signals for uploaded accounts...</p>
         </div>
@@ -237,7 +237,7 @@ export function AccountsPage() {
 
       {/* Table */}
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 flex flex-col items-center justify-center py-20 gap-3">
+        <div className="bg-white rounded-2xl border border-violet-100 shadow-sm shadow-violet-50 flex flex-col items-center justify-center py-20 gap-3">
           <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
             <Users className="w-6 h-6 text-gray-400" />
           </div>
@@ -247,10 +247,10 @@ export function AccountsPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-violet-100 shadow-sm shadow-violet-50 overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
+              <tr className="border-b border-violet-100 bg-violet-50/40">
                 <th className="px-4 py-3 w-10">
                   <input
                     type="checkbox"

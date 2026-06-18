@@ -50,24 +50,30 @@ export function Layout({ children }: LayoutProps) {
     : '?';
 
   const pageTitle = navItems.find(item => location.pathname.startsWith(item.path))?.label ?? 'SignalIQ';
-  const sidebarWidth = collapsed ? 'w-14' : 'w-56';
-  const mainMargin = collapsed ? 'ml-14' : 'ml-56';
+  const sidebarWidth = collapsed ? 'w-16' : 'w-60';
+  const mainMargin = collapsed ? 'ml-16' : 'ml-60';
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-[#F5F3FF] flex">
       {/* Sidebar */}
-      <aside className={cn('bg-white border-r border-gray-100 flex flex-col fixed inset-y-0 left-0 z-30 transition-all duration-200', sidebarWidth)}>
-        {/* Logo + collapse toggle */}
-        <div className="px-3 py-4 border-b border-gray-100 flex items-center justify-between">
-          <Link to="/accounts" className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 bg-violet-700 rounded-lg flex items-center justify-center flex-shrink-0">
+      <aside className={cn(
+        'bg-white flex flex-col fixed inset-y-0 left-0 z-30 transition-all duration-200',
+        'border-r border-violet-100',
+        sidebarWidth
+      )}>
+        {/* Logo */}
+        <div className="px-4 py-5 flex items-center justify-between">
+          <Link to="/accounts" className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-800 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm shadow-violet-300">
               <Zap className="w-4 h-4 text-white fill-white" />
             </div>
-            {!collapsed && <span className="font-semibold text-gray-900 text-sm tracking-tight truncate">SignalIQ</span>}
+            {!collapsed && (
+              <span className="font-bold text-gray-900 text-base tracking-tight truncate">SignalIQ</span>
+            )}
           </Link>
           <button
             onClick={() => setCollapsed(c => !c)}
-            className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0"
+            className="p-1 rounded-lg text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors flex-shrink-0"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
@@ -75,7 +81,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-2 py-4 space-y-0.5">
+        <nav className="flex-1 px-3 py-2 space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
@@ -84,12 +90,14 @@ export function Layout({ children }: LayoutProps) {
                 to={item.path}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors',
-                  collapsed && 'justify-center',
-                  isActive ? 'text-violet-700 font-medium bg-violet-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  collapsed && 'justify-center px-2',
+                  isActive
+                    ? 'bg-gradient-to-r from-violet-600 to-violet-700 text-white shadow-sm shadow-violet-200'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-violet-50'
                 )}
               >
-                <item.icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-violet-700' : 'text-gray-400')} />
+                <item.icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-white' : 'text-gray-400')} />
                 {!collapsed && item.label}
               </Link>
             );
@@ -97,33 +105,38 @@ export function Layout({ children }: LayoutProps) {
         </nav>
 
         {/* Bottom */}
-        <div className="px-2 py-3 border-t border-gray-100">
+        <div className="px-3 py-3 border-t border-violet-50 space-y-1">
           <Link
             to="/settings"
             title={collapsed ? 'Settings' : undefined}
             className={cn(
-              'flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-colors mb-1',
-              collapsed && 'justify-center',
-              location.pathname === '/settings' ? 'text-violet-700 font-medium bg-violet-50' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+              collapsed && 'justify-center px-2',
+              location.pathname === '/settings'
+                ? 'bg-gradient-to-r from-violet-600 to-violet-700 text-white shadow-sm shadow-violet-200'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-violet-50'
             )}
           >
-            <Settings className={cn('w-4 h-4 flex-shrink-0', location.pathname === '/settings' ? 'text-violet-700' : 'text-gray-400')} />
+            <Settings className={cn('w-4 h-4 flex-shrink-0', location.pathname === '/settings' ? 'text-white' : 'text-gray-400')} />
             {!collapsed && 'Settings'}
           </Link>
 
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen((o) => !o)}
-              className={cn('w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left', collapsed && 'justify-center')}
+              className={cn(
+                'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-violet-50 transition-colors text-left',
+                collapsed && 'justify-center px-2'
+              )}
               title={collapsed ? currentUser?.name : undefined}
             >
-              <div className="w-6 h-6 rounded-full bg-violet-700 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0">
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-600 to-violet-800 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
                 {initials}
               </div>
               {!collapsed && (
                 <>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-900 truncate">{currentUser?.name}</p>
+                    <p className="text-xs font-semibold text-gray-900 truncate">{currentUser?.name}</p>
                     <p className="text-xs text-gray-400 truncate">{currentUser?.email}</p>
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
@@ -132,14 +145,17 @@ export function Layout({ children }: LayoutProps) {
             </button>
 
             {dropdownOpen && (
-              <div className={cn('absolute bottom-full mb-1 bg-white rounded-xl border border-gray-200 shadow-lg py-1 z-50 w-48', collapsed ? 'left-full ml-2 bottom-0' : 'left-0 right-0')}>
+              <div className={cn(
+                'absolute bottom-full mb-1 bg-white rounded-2xl border border-violet-100 shadow-xl shadow-violet-100 py-1.5 z-50 w-52',
+                collapsed ? 'left-full ml-2 bottom-0' : 'left-0 right-0'
+              )}>
                 <button onClick={handleLogout}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-violet-50 transition-colors">
                   <LogOut className="w-4 h-4 text-gray-400" />
                   Sign out
                 </button>
                 <button onClick={handleReset}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition-colors border-t border-gray-100">
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors border-t border-gray-100">
                   <LogOut className="w-4 h-4" />
                   Reset all data
                 </button>
@@ -151,15 +167,17 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Main area */}
       <div className={cn('flex-1 flex flex-col min-h-screen transition-all duration-200', mainMargin)}>
-        <header className="bg-white border-b border-gray-100 sticky top-0 z-20">
+        {/* Top header */}
+        <header className="bg-white/80 backdrop-blur-sm border-b border-violet-100 sticky top-0 z-20">
           <div className="px-6 h-14 flex items-center justify-between">
-            <h1 className="text-sm font-semibold text-gray-900">{pageTitle}</h1>
-            <button className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors relative">
+            <h1 className="text-base font-bold text-gray-900">{pageTitle}</h1>
+            <button className="p-2 rounded-xl text-gray-400 hover:text-violet-600 hover:bg-violet-50 transition-colors relative">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
             </button>
           </div>
         </header>
+
         <main className="flex-1 px-6 py-6">
           {children}
         </main>

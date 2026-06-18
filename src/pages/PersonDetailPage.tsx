@@ -122,7 +122,7 @@ export function PersonDetailPage() {
       </Link>
 
       {/* Header card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl border border-violet-100 shadow-sm shadow-violet-50 p-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           {/* Left: avatar + name */}
           <div className="flex items-center gap-4">

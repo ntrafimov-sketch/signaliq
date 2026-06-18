@@ -9,19 +9,19 @@ interface BadgeProps {
 const variantClasses: Record<string, string> = {
   hot: 'bg-red-100 text-red-700 border border-red-200',
   warm: 'bg-orange-100 text-orange-700 border border-orange-200',
-  cold: 'bg-blue-100 text-blue-700 border border-blue-200',
-  high: 'bg-green-100 text-green-700 border border-green-200',
-  medium: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-  low: 'bg-slate-100 text-slate-600 border border-slate-200',
-  default: 'bg-slate-100 text-slate-700 border border-slate-200',
-  outline: 'bg-white text-slate-700 border border-slate-300',
+  cold: 'bg-sky-100 text-sky-700 border border-sky-200',
+  high: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  medium: 'bg-amber-100 text-amber-700 border border-amber-200',
+  low: 'bg-violet-50 text-violet-500 border border-violet-100',
+  default: 'bg-violet-50 text-violet-700 border border-violet-100',
+  outline: 'bg-white text-gray-600 border border-gray-200',
 };
 
 export function Badge({ children, variant = 'default', className }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
+        'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold',
         variantClasses[variant],
         className
       )}
