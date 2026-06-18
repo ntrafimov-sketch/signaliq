@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search, Globe, Users, ChevronUp, ChevronDown,
-  CheckCircle2, Loader2, Plus, Trash2
+  CheckCircle2, Loader2, Plus, Trash2, Sparkles, Copy, ExternalLink
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { CsvUpload } from '../components/CsvUpload';
@@ -45,6 +45,138 @@ function AccountLogo({ domain, name }: { domain: string; name: string }) {
     );
   }
   return <Avatar name={name} size="sm" />;
+}
+
+const BRIDGE = 'http://localhost:7337';
+
+function AddCompanyModal({ onClose }: { onClose: () => void }) {
+  const [tab, setTab] = useState<'ai' | 'csv'>('ai');
+  const [bridgeOk, setBridgeOk] = useState<boolean | null>(null);
+  const [form, setForm] = useState({ company: '', app_name: '', domain: '', linkedin: '' });
+  const [status, setStatus] = useState<'idle' | 'launching' | 'done' | 'copied'>('idle');
+
+  useEffect(() => {
+    fetch(`${BRIDGE}/health`, { signal: AbortSignal.timeout(1500) })
+      .then(r => r.ok ? setBridgeOk(true) : setBridgeOk(false))
+      .catch(() => setBridgeOk(false));
+  }, []);
+
+  const buildPrompt = () => {
+    const parts = [];
+    if (form.company) parts.push(`Company: ${form.company}`);
+    if (form.domain) parts.push(`Domain: ${form.domain}`);
+    if (form.app_name) parts.push(`App: ${form.app_name}`);
+    if (form.linkedin) parts.push(`LinkedIn: ${form.linkedin}`);
+    return 'Research account — ' + parts.join(', ');
+  };
+
+  const handleLaunch = async () => {
+    setStatus('launching');
+    if (bridgeOk) {
+      try {
+        const res = await fetch(`${BRIDGE}/trigger`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        });
+        if (res.ok) {
+          setStatus('done');
+          setTimeout(onClose, 2000);
+        } else throw new Error();
+      } catch {
+        setBridgeOk(false);
+        setStatus('idle');
+      }
+    } else {
+      navigator.clipboard.writeText(buildPrompt()).catch(() => {});
+      setStatus('copied');
+    }
+  };
+
+  const field = (key: keyof typeof form, label: string, placeholder: string, required = false) => (
+    <div>
+      <label className="block text-xs font-semibold text-gray-500 mb-1">
+        {label}{required && <span className="text-violet-500 ml-0.5">*</span>}
+      </label>
+      <input
+        type="text"
+        value={form[key]}
+        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+      />
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-bold text-gray-900">Add Company</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border border-gray-200 rounded-xl overflow-hidden mb-5">
+          {([['ai', 'AI Research'], ['csv', 'CSV Import']] as const).map(([t, label]) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={cn('flex-1 py-2 text-sm font-semibold transition-colors',
+                tab === t ? 'bg-violet-600 text-white' : 'text-gray-500 hover:bg-violet-50')}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'csv' && <CsvUpload />}
+
+        {tab === 'ai' && (
+          <div className="space-y-4">
+            {/* Bridge status */}
+            <div className={cn('flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border',
+              bridgeOk === true ? 'bg-green-50 border-green-100 text-green-700'
+              : bridgeOk === false ? 'bg-amber-50 border-amber-100 text-amber-700'
+              : 'bg-gray-50 border-gray-100 text-gray-400')}>
+              <span className={cn('w-2 h-2 rounded-full flex-shrink-0',
+                bridgeOk === true ? 'bg-green-500' : bridgeOk === false ? 'bg-amber-400' : 'bg-gray-300 animate-pulse')} />
+              {bridgeOk === true ? 'Bridge connected — will launch directly in Claude Desktop'
+                : bridgeOk === false ? 'Bridge offline — will copy prompt to clipboard instead'
+                : 'Checking bridge…'}
+              {bridgeOk === false && (
+                <a href="https://github.com" className="ml-auto flex items-center gap-1 text-amber-600 hover:underline">
+                  <ExternalLink className="w-3 h-3" /> run bridge.py
+                </a>
+              )}
+            </div>
+
+            {field('company', 'Company Name', 'e.g. Endel', true)}
+            {field('app_name', 'App Name', 'e.g. Endel: Sleep & Focus Music')}
+            {field('domain', 'Company Domain', 'e.g. endel.io')}
+            {field('linkedin', 'LinkedIn URL', 'e.g. linkedin.com/company/endel')}
+
+            <button
+              onClick={handleLaunch}
+              disabled={!form.company || status === 'launching' || status === 'done'}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all',
+                status === 'done' ? 'bg-green-500 text-white'
+                  : status === 'copied' ? 'bg-violet-100 text-violet-700'
+                  : 'bg-gradient-to-br from-violet-600 to-violet-700 text-white hover:from-violet-700 hover:to-violet-800 disabled:opacity-40'
+              )}>
+              {status === 'launching' && <Loader2 className="w-4 h-4 animate-spin" />}
+              {status === 'done' && <CheckCircle2 className="w-4 h-4" />}
+              {status === 'copied' && <Copy className="w-4 h-4" />}
+              {status === 'idle' && <Sparkles className="w-4 h-4" />}
+              {status === 'done' ? 'Agent launched in Claude Desktop ✓'
+                : status === 'copied' ? 'Prompt copied — paste in Claude Desktop'
+                : status === 'launching' ? 'Launching…'
+                : bridgeOk ? 'Launch Research'
+                : 'Copy Prompt'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function AccountsPage() {
@@ -347,15 +479,7 @@ export function AccountsPage() {
 
       {/* Add Company Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowAddModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Add Company</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-            </div>
-            <CsvUpload />
-          </div>
-        </div>
+        <AddCompanyModal onClose={() => setShowAddModal(false)} />
       )}
     </div>
   );
