@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { MetricChart } from '../components/MetricChart';
+import { OrgChart } from '../components/OrgChart';
 import { SignalCategoryBadge, ConfidenceBadge } from '../components/SignalBadge';
 import { useStore } from '../store/useStore';
 import { importTorpedoJson } from '../services/importTorpedo';
@@ -52,7 +53,6 @@ function ImpactDots({ level }: { level: 'High' | 'Medium' | 'Low' }) {
 }
 
 const SIGNAL_CATEGORIES: Array<SignalCategory | 'All'> = ['All', 'Revenue', 'Competitive', 'Content', 'Social', 'Hiring'];
-const AVATAR_PALETTE = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6', '#10b981'];
 
 export function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -606,58 +606,13 @@ export function AccountDetailPage() {
           )}
 
           {/* Org Chart view */}
-          {peopleView === 'org' && account.orgChart && (() => {
-            const org = account.orgChart!;
-            const sections = [
-              { label: 'C-Level', people: org.c_level ?? [], color: 'bg-violet-100 text-violet-700 border-violet-200' },
-              { label: 'VP / Director', people: org.vp_director ?? [], color: 'bg-indigo-50 text-indigo-600 border-indigo-100' },
-              { label: 'Manager / IC', people: org.manager_ic ?? [], color: 'bg-gray-50 text-gray-600 border-gray-100' },
-              { label: 'Other', people: org.unknown ?? [], color: 'bg-gray-50 text-gray-500 border-gray-100' },
-            ].filter(s => s.people.length > 0);
-
-            return (
-              <div className="space-y-5">
-                {sections.map(section => (
-                  <div key={section.label}>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">{section.label}</p>
-                    <div className="space-y-2">
-                      {section.people.map((p, i) => {
-                        const linked = (account.people ?? []).find(person =>
-                          person.name.toLowerCase().includes(p.name.split(' ')[0].toLowerCase()) ||
-                          p.name.toLowerCase().includes(person.name.split(' ')[0].toLowerCase())
-                        );
-                        return (
-                          <div key={i} className={cn('flex items-center gap-3 px-4 py-3 rounded-xl border', section.color)}>
-                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                              style={{ background: AVATAR_PALETTE[i % AVATAR_PALETTE.length] }}>
-                              {p.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              {linked ? (
-                                <Link to={`/accounts/${account.id}/people/${linked.id}`}
-                                  className="text-sm font-semibold text-gray-900 hover:text-violet-600 transition-colors">
-                                  {p.name}
-                                </Link>
-                              ) : (
-                                <p className="text-sm font-semibold text-gray-900">{p.name}</p>
-                              )}
-                              <p className="text-xs text-gray-500 truncate">{p.title}</p>
-                            </div>
-                            {p.reports_to && (
-                              <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
-                                <span className="hidden sm:inline">→</span>
-                                <span className="hidden sm:inline truncate max-w-32">{p.reports_to}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
+          {peopleView === 'org' && account.orgChart && (
+            <OrgChart
+              orgChart={account.orgChart}
+              people={account.people ?? []}
+              accountId={account.id}
+            />
+          )}
 
           {/* Contacts view */}
           {peopleView === 'contacts' && (amplemarketPeople.length === 0 ? (
