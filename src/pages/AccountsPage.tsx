@@ -84,7 +84,7 @@ export function AccountsPage() {
         const baseId = account ? account.id : `webhook-${Date.now()}`;
         const baseName = account ? account.company_name : companyName;
 
-        console.log('[webhook] torpedoData type:', typeof torpedoData, Array.isArray(torpedoData), torpedoData);
+        console.log('[webhook] torpedoData type:', typeof torpedoData, Array.isArray(torpedoData));
         // Clay sometimes sends an object instead of array — wrap it
         const safeData: unknown[] = Array.isArray(torpedoData)
           ? torpedoData
@@ -92,6 +92,8 @@ export function AccountsPage() {
           ? Object.values(torpedoData as Record<string, unknown>)
           : [];
         const updates = importTorpedoJson(safeData as Parameters<typeof importTorpedoJson>[0], baseId, baseName);
+        console.log('[webhook] parsed entries:', (safeData as {type?:string}[]).map((e: {type?:string}) => e?.type));
+        console.log('[webhook] revenueHistory:', updates.revenueHistory?.length, 'downloadHistory:', updates.downloadHistory?.length);
 
         if (!account) {
           const newAccount: Account = {
@@ -118,11 +120,14 @@ export function AccountsPage() {
             whyKeywords: updates.whyKeywords,
             opportunitySummary: updates.opportunitySummary,
             adIntelligence: updates.adIntelligence,
+            revenueHistory: updates.revenueHistory,
+            downloadHistory: updates.downloadHistory,
           };
           console.log('[webhook] creating new account', newAccount.company_name, newAccount.id);
           addAccounts([newAccount]);
         } else {
-          console.log('[webhook] updating existing account', account.company_name);
+          console.log('[webhook] updating existing account', account.company_name,
+            'revHistory:', updates.revenueHistory?.length, 'dlHistory:', updates.downloadHistory?.length);
           updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
         }
       } catch (err) {
