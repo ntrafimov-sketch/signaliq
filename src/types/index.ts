@@ -81,7 +81,8 @@ export interface Account {
   news?: Array<{ date: string; title: string; source?: string; url?: string; summary?: string }>;
   investmentHistory?: Array<{ round: string; amount: string; investors: string[]; date: string }>;
   paywallAnalysis?: { paywall_type: string; key_observations: string[]; monetization_stack: string[]; opportunities: string[] };
-  paywallScreenshot?: string; // base64 data URL
+  paywallScreenshot?: string;
+  products?: Array<{ app_name: string; platform: string; has_in_app_purchases?: boolean | null; store_url_ios?: string; store_url_android?: string; description?: string }>;
 }
 
 export interface CareerEntry {

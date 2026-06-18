@@ -332,6 +332,7 @@ export function AccountsPage() {
             revenueHistory: updates.revenueHistory,
             downloadHistory: updates.downloadHistory,
             news: updates.news,
+            products: updates.products,
             investmentHistory: updates.investmentHistory,
             paywallAnalysis: updates.paywallAnalysis,
             paywallScreenshot: updates.paywallScreenshot,

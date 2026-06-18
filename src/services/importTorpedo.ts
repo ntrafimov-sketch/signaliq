@@ -160,6 +160,19 @@ export function importTorpedoJson(
         break;
       }
 
+      case 'products': {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        updates.products = (Array.isArray(entry.data) ? entry.data : []).map((p: any) => ({
+          app_name: p.app_name || p.name || '',
+          platform: p.platform || 'both',
+          has_in_app_purchases: p.has_in_app_purchases ?? null,
+          store_url_ios: p.store_url_ios || p.store_id_ios ? `https://apps.apple.com/app/id${p.store_id_ios}` : undefined,
+          store_url_android: p.store_url_android,
+          description: p.description,
+        }));
+        break;
+      }
+
       case 'sdks': {
         const PAYWALL = ['revenuecat', 'superwall', 'purchasely', 'qonversion', 'apphud'];
         const LIFECYCLE = ['braze', 'customer.io', 'customerio', 'clevertap', 'leanplum', 'intercom'];

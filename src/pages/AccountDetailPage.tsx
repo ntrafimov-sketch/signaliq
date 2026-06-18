@@ -305,6 +305,47 @@ export function AccountDetailPage() {
               </CardContent>
             </Card>
 
+            {/* Apps card */}
+            {account.products && account.products.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Apps</h2>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {account.products.map((app, i) => (
+                    <div key={i} className="flex items-start justify-between gap-3">
+                      <div className="space-y-0.5 flex-1">
+                        <p className="text-sm font-semibold text-gray-900">{app.app_name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs capitalize">{app.platform}</span>
+                          {app.has_in_app_purchases === true && (
+                            <span className="px-2 py-0.5 bg-violet-50 text-violet-600 border border-violet-100 rounded-full text-xs font-medium">IAP</span>
+                          )}
+                          {app.has_in_app_purchases === false && (
+                            <span className="px-2 py-0.5 bg-gray-50 text-gray-400 border border-gray-100 rounded-full text-xs">No IAP</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {app.store_url_ios && (
+                          <a href={app.store_url_ios} target="_blank" rel="noopener noreferrer"
+                            className="px-2 py-1 bg-gray-50 hover:bg-violet-50 text-gray-400 hover:text-violet-600 rounded-lg text-xs transition-colors">
+                            iOS
+                          </a>
+                        )}
+                        {app.store_url_android && (
+                          <a href={app.store_url_android} target="_blank" rel="noopener noreferrer"
+                            className="px-2 py-1 bg-gray-50 hover:bg-violet-50 text-gray-400 hover:text-violet-600 rounded-lg text-xs transition-colors">
+                            Android
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Investment card */}
             <Card>
               <CardHeader>
