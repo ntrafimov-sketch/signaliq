@@ -15,9 +15,9 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import type { Person, Signal, SignalCategory } from '../types';
 
-type Tab = 'Overview' | 'Signals' | 'People' | 'HubSpot' | 'Ad Channels';
+type Tab = 'Overview' | 'Signals' | 'News' | 'Paywall' | 'People' | 'HubSpot' | 'Ad Channels';
 
-const TABS: Tab[] = ['Overview', 'Signals', 'People', 'HubSpot', 'Ad Channels'];
+const TABS: Tab[] = ['Overview', 'Signals', 'News', 'Paywall', 'People', 'HubSpot', 'Ad Channels'];
 
 function ScoreRingLarge({ score, tier }: { score: number; tier: string }) {
   const r = 26, circ = 2 * Math.PI * r;
@@ -234,109 +234,6 @@ export function AccountDetailPage() {
               </CardContent>
             </Card>
 
-            {/* News card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Newspaper className="w-4 h-4 text-violet-500" />
-                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">News</h2>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {(!account.news || account.news.length === 0) ? (
-                  <p className="text-sm text-gray-400 text-center py-4">No news data yet</p>
-                ) : (
-                  <div className="space-y-4">
-                    {account.news.map((item, i) => (
-                      <div key={i} className="space-y-1">
-                        <p className="text-xs text-gray-400">{item.date}</p>
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                          {item.url && (
-                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-indigo-600 flex-shrink-0">
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                        </div>
-                        {item.source && (
-                          <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">{item.source}</span>
-                        )}
-                        {item.summary && (
-                          <p className="text-xs text-gray-500 leading-relaxed">{item.summary}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Paywall Analysis card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4 text-violet-500" />
-                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Paywall Analysis</h2>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {!account.paywallScreenshot && !account.paywallAnalysis ? (
-                  <p className="text-sm text-gray-400 text-center py-4">No paywall data yet — upload a screenshot when adding the company</p>
-                ) : (
-                  <div className="space-y-4">
-                    {account.paywallScreenshot && (
-                      <img
-                        src={account.paywallScreenshot}
-                        alt="Paywall screenshot"
-                        className="w-full rounded-xl max-h-64 object-contain bg-gray-50"
-                      />
-                    )}
-                    {account.paywallAnalysis && (
-                      <div className="space-y-3">
-                        <span className="inline-block px-2.5 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-semibold">
-                          {account.paywallAnalysis.paywall_type}
-                        </span>
-                        {account.paywallAnalysis.key_observations.length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Key Observations</p>
-                            <ul className="space-y-1">
-                              {account.paywallAnalysis.key_observations.map((obs, i) => (
-                                <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
-                                  <span className="text-gray-300 mt-0.5">•</span>{obs}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {account.paywallAnalysis.monetization_stack.length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Monetization Stack</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {account.paywallAnalysis.monetization_stack.map((item, i) => (
-                                <span key={i} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs">{item}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {account.paywallAnalysis.opportunities.length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Opportunities</p>
-                            <ul className="space-y-1">
-                              {account.paywallAnalysis.opportunities.map((opp, i) => (
-                                <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
-                                  <span className="text-gray-300 mt-0.5">•</span>{opp}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
           </div>
 
           {/* Right col */}
@@ -465,6 +362,142 @@ export function AccountDetailPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'News' && (
+        <div className="space-y-4 max-w-3xl">
+          {(!account.news || account.news.length === 0) ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <Newspaper className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+                <p className="text-sm text-gray-400">No news data yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            account.news.map((item, i) => (
+              <Card key={i}>
+                <CardContent className="py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-gray-400">{item.date}</span>
+                        {item.source && (
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">{item.source}</span>
+                        )}
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                      {item.summary && (
+                        <p className="text-sm text-gray-500 leading-relaxed">{item.summary}</p>
+                      )}
+                    </div>
+                    {item.url && (
+                      <a href={item.url} target="_blank" rel="noopener noreferrer"
+                        className="flex-shrink-0 text-gray-400 hover:text-violet-600 transition-colors">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {activeTab === 'Paywall' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="space-y-4">
+            {account.paywallScreenshot ? (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Screenshot</h2>
+                </CardHeader>
+                <CardContent>
+                  <img
+                    src={account.paywallScreenshot}
+                    alt="Paywall screenshot"
+                    className="w-full rounded-xl object-contain bg-gray-50"
+                  />
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  <LayoutGrid className="w-8 h-8 text-gray-200 mx-auto mb-3" />
+                  <p className="text-sm text-gray-400">No paywall screenshot yet — upload one when adding the company</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+          <div className="space-y-4">
+            {account.paywallAnalysis ? (
+              <>
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Paywall Type</h2>
+                      <span className="px-2.5 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-semibold">
+                        {account.paywallAnalysis.paywall_type}
+                      </span>
+                    </div>
+                  </CardHeader>
+                </Card>
+                {account.paywallAnalysis.key_observations.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Key Observations</h2>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-2">
+                        {account.paywallAnalysis.key_observations.map((obs, i) => (
+                          <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                            <span className="text-violet-400 mt-0.5 flex-shrink-0">•</span>{obs}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+                {account.paywallAnalysis.monetization_stack.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Monetization Stack</h2>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {account.paywallAnalysis.monetization_stack.map((item, i) => (
+                          <span key={i} className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs font-medium">{item}</span>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                {account.paywallAnalysis.opportunities.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Opportunities</h2>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-2">
+                        {account.paywallAnalysis.opportunities.map((opp, i) => (
+                          <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                            <span className="text-violet-400 mt-0.5 flex-shrink-0">→</span>{opp}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            ) : (
+              <Card>
+                <CardContent className="py-10 text-center">
+                  <p className="text-sm text-gray-400">No paywall analysis data yet</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       )}
 
