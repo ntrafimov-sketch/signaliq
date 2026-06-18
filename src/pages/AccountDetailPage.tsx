@@ -182,6 +182,22 @@ export function AccountDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Left col (col-span-2) */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Charts first */}
+            {account.revenueHistory && account.revenueHistory.length > 1 && (
+              <Card>
+                <CardContent>
+                  <MetricChart data={account.revenueHistory} type="revenue" title="iOS + Android Revenue" />
+                </CardContent>
+              </Card>
+            )}
+            {account.downloadHistory && account.downloadHistory.length > 1 && (
+              <Card>
+                <CardContent>
+                  <MetricChart data={account.downloadHistory} type="downloads" title="iOS + Android Downloads" />
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Why This Account Matters</h2>
@@ -217,21 +233,6 @@ export function AccountDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Charts */}
-            {account.revenueHistory && account.revenueHistory.length > 1 && (
-              <Card>
-                <CardContent>
-                  <MetricChart data={account.revenueHistory} type="revenue" title="iOS + Android Revenue" />
-                </CardContent>
-              </Card>
-            )}
-            {account.downloadHistory && account.downloadHistory.length > 1 && (
-              <Card>
-                <CardContent>
-                  <MetricChart data={account.downloadHistory} type="downloads" title="iOS + Android Downloads" />
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           {/* Right col */}
