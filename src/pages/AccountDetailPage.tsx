@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Download, RefreshCw,
   Calendar, MessageSquare, Briefcase, ChevronDown, ChevronRight, ExternalLink,
-  Newspaper, TrendingUp, LayoutGrid
+  Newspaper, TrendingUp, ImagePlus
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -496,27 +496,42 @@ export function AccountDetailPage() {
       {activeTab === 'Paywall' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div className="space-y-4">
-            {account.paywallScreenshot ? (
-              <Card>
-                <CardHeader>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Screenshot</h2>
-                </CardHeader>
-                <CardContent>
+                  {account.paywallScreenshot && (
+                    <button
+                      onClick={() => updateAccount(account.id, { paywallScreenshot: undefined })}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {account.paywallScreenshot ? (
                   <img
                     src={account.paywallScreenshot}
                     alt="Paywall screenshot"
                     className="w-full rounded-xl object-contain bg-gray-50"
                   />
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="py-10 text-center">
-                  <LayoutGrid className="w-8 h-8 text-gray-200 mx-auto mb-3" />
-                  <p className="text-sm text-gray-400">No paywall screenshot yet — upload one when adding the company</p>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-3 py-12 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-violet-300 hover:bg-violet-50/40 transition-colors group">
+                    <input type="file" accept="image/*" className="hidden" onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => updateAccount(account.id, { paywallScreenshot: ev.target?.result as string });
+                      reader.readAsDataURL(file);
+                    }} />
+                    <ImagePlus className="w-8 h-8 text-gray-300 group-hover:text-violet-400 transition-colors" />
+                    <span className="text-sm text-gray-400 group-hover:text-violet-500 transition-colors font-medium">Click to upload paywall screenshot</span>
+                    <span className="text-xs text-gray-300">PNG, JPG, WebP</span>
+                  </label>
+                )}
+              </CardContent>
+            </Card>
           </div>
           <div className="space-y-4">
             {account.paywallAnalysis ? (
