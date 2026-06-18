@@ -143,19 +143,11 @@ export function MetricChart({ data, type, title }: MetricChartProps) {
       </svg>
 
       {/* Summary row */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'iOS last month', val: points[points.length - 1]?.ios ?? 0, color: iosColor },
-          { label: 'Android last month', val: points[points.length - 1]?.android ?? 0, color: androidColor },
-          { label: 'Total last month', val: points[points.length - 1]?.total ?? 0, color: totalColor },
-        ].map(item => (
-          <div key={item.label} className="bg-violet-50/60 rounded-xl px-3 py-2">
-            <p className="text-[10px] text-gray-400 mb-0.5">{item.label}</p>
-            <p className="text-sm font-bold" style={{ color: item.color }}>
-              {fmtValue(item.val, type)}
-            </p>
-          </div>
-        ))}
+      <div className="bg-violet-50/60 rounded-xl px-4 py-2.5 flex items-center justify-between">
+        <p className="text-xs text-gray-400 font-medium">Last month</p>
+        <p className="text-sm font-bold" style={{ color: totalColor }}>
+          {fmtValue(points[points.length - 1]?.total ?? 0, type)}
+        </p>
       </div>
     </div>
   );
