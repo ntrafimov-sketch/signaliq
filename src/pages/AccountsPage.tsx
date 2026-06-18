@@ -49,7 +49,7 @@ function AccountLogo({ domain, name }: { domain: string; name: string }) {
 
 const BRIDGE = 'http://localhost:7337';
 
-function AddCompanyModal({ onClose }: { onClose: () => void }) {
+function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onResearching: (company: string, domain: string) => void }) {
   const [tab, setTab] = useState<'ai' | 'csv'>('ai');
   const [bridgeOk, setBridgeOk] = useState<boolean | null>(null);
   const [form, setForm] = useState({ company: '', app_name: '', domain: '', linkedin: '' });
@@ -81,7 +81,8 @@ function AddCompanyModal({ onClose }: { onClose: () => void }) {
         });
         if (res.ok) {
           setStatus('done');
-          setTimeout(onClose, 2000);
+          onResearching(form.company, form.domain);
+          setTimeout(onClose, 1500);
         } else throw new Error();
       } catch {
         setBridgeOk(false);
@@ -450,7 +451,14 @@ export function AccountsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <ScoreRing score={account.score} tier={account.scoreLabel} />
+                    {account.enrichmentStatus === 'enriching' ? (
+                      <div className="flex items-center gap-2 text-violet-600">
+                        <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                        <span className="text-xs font-semibold">Researching…</span>
+                      </div>
+                    ) : (
+                      <ScoreRing score={account.score} tier={account.scoreLabel} />
+                    )}
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="flex items-center gap-1.5 text-sm text-gray-600">
@@ -479,7 +487,31 @@ export function AccountsPage() {
 
       {/* Add Company Modal */}
       {showAddModal && (
-        <AddCompanyModal onClose={() => setShowAddModal(false)} />
+        <AddCompanyModal
+          onClose={() => setShowAddModal(false)}
+          onResearching={(company, domain) => {
+            const id = `researching-${Date.now()}`;
+            addAccounts([{
+              id,
+              company_name: company,
+              domain: domain || '',
+              industry: '',
+              country: '',
+              employees: 0,
+              score: 0,
+              scoreLabel: 'Cold',
+              signals: [],
+              lastUpdated: 'Just now',
+              description: '',
+              founded: '',
+              hq: '',
+              revenue: '',
+              status: '',
+              logoColor: '#7c3aed',
+              enrichmentStatus: 'enriching',
+            }]);
+          }}
+        />
       )}
     </div>
   );

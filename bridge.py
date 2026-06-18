@@ -2,7 +2,7 @@
 # Run with: python3 bridge.py
 """
 SignalIQ Bridge — triggers Claude Desktop from the dashboard form.
-Run once: python bridge.py
+Run once: python3 bridge.py
 """
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -11,6 +11,11 @@ import subprocess
 import sys
 
 PORT = 7337
+
+# Claude Desktop app name on Mac — change if needed
+# Run `osascript -e 'tell application "System Events" to get name of every application process'`
+# to see all running app names
+CLAUDE_APP = "Claude"
 
 
 def trigger_claude(data: dict) -> None:
@@ -25,28 +30,48 @@ def trigger_claude(data: dict) -> None:
         parts.append(f"LinkedIn: {data['linkedin']}")
 
     prompt = "/torpedo-research-agent " + ", ".join(parts)
-
-    # Escape for AppleScript string
     prompt_escaped = prompt.replace("\\", "\\\\").replace('"', '\\"')
 
     script = f"""
-tell application "Claude" to activate
-delay 0.6
-tell application "System Events"
-    keystroke "n" using command down
-    delay 0.6
-    set the clipboard to "{prompt_escaped}"
-    keystroke "v" using command down
-    delay 0.2
-    key code 36
+-- Remember which app is currently in front
+set prevApp to (path to frontmost application as text)
+
+-- Find Claude Desktop window (not Claude Code)
+-- We target by bundle ID to avoid hitting Claude Code CLI wrapper
+tell application "{CLAUDE_APP}"
+    -- Open a new chat without stealing focus permanently
+    activate
 end tell
+
+delay 0.5
+
+tell application "System Events"
+    tell process "{CLAUDE_APP}"
+        -- Cmd+N opens new conversation
+        keystroke "n" using command down
+        delay 0.5
+        -- Paste the prompt
+        set the clipboard to "{prompt_escaped}"
+        keystroke "v" using command down
+        delay 0.3
+        -- Send
+        key code 36
+    end tell
+end tell
+
+delay 0.3
+
+-- Switch back to the app that was in front before
+try
+    tell application (prevApp) to activate
+end try
 """
     subprocess.run(["osascript", "-e", script], check=True)
 
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        pass  # suppress default access logs
+        pass
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -80,8 +105,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(b'{"ok":true}')
-                company = body.get("company", "unknown")
-                print(f"  ✓ Launched research for: {company}")
+                print(f"  ✓ Launched research for: {body.get('company', '?')}")
             except Exception as e:
                 self.send_response(500)
                 self._cors()
@@ -95,9 +119,24 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    # Detect which Claude app is running
+    try:
+        result = subprocess.run(
+            ["osascript", "-e",
+             'tell application "System Events" to get name of every application process'],
+            capture_output=True, text=True
+        )
+        procs = result.stdout
+        if "Claude Code" in procs and "Claude" in procs:
+            print("  ⚠️  Both 'Claude' and 'Claude Code' detected.")
+            print(f"  → Targeting: '{CLAUDE_APP}'")
+            print("  → If wrong, edit CLAUDE_APP at top of bridge.py\n")
+    except Exception:
+        pass
+
     server = HTTPServer(("localhost", PORT), Handler)
-    print(f"\n  SignalIQ Bridge running on http://localhost:{PORT}")
-    print("  Open Claude Desktop and start researching from the dashboard!\n")
+    print(f"  SignalIQ Bridge running on http://localhost:{PORT}")
+    print("  Ready — researching will happen in background!\n")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
