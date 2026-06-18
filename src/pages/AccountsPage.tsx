@@ -301,8 +301,9 @@ export function AccountsPage() {
           ? Object.values(torpedoData as Record<string, unknown>)
           : [];
         const updates = importTorpedoJson(safeData as Parameters<typeof importTorpedoJson>[0], baseId, baseName);
-        console.log('[webhook] parsed entries:', (safeData as {type?:string}[]).map((e: {type?:string}) => e?.type));
-        console.log('[webhook] revenueHistory:', updates.revenueHistory?.length, 'downloadHistory:', updates.downloadHistory?.length);
+        const entryTypes = (safeData as {type?:string}[]).map((e: {type?:string}) => e?.type);
+        console.log('[webhook] parsed entry types:', entryTypes);
+        console.log('[webhook] updates keys with data:', Object.entries(updates).filter(([,v]) => v !== undefined).map(([k]) => k));
 
         if (!account) {
           const newAccount: Account = {
@@ -343,7 +344,8 @@ export function AccountsPage() {
           addAccounts([newAccount]);
         } else {
           console.log('[webhook] updating existing account', account.company_name,
-            'revHistory:', updates.revenueHistory?.length, 'dlHistory:', updates.downloadHistory?.length);
+            'orgChart:', !!updates.orgChart, 'news:', updates.news?.length,
+            'people:', updates.people?.length, 'signals:', updates.signals?.length);
           updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
         }
       } catch (err) {
