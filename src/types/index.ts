@@ -109,6 +109,7 @@ export interface Person {
   avatarColor: string;
   careerTrack?: CareerEntry[];
   recentPosts?: Array<{ date: string; platform: string; content: string; url?: string }>;
+  whatToPitch?: { likelyPriorities?: string; recommendedAngle?: string; painPoints?: string };
 }
 
 export interface AdIntelligence {

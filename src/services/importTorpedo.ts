@@ -350,6 +350,14 @@ export function importTorpedoJson(
             url: p.url,
           })) : undefined;
 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const wtp = c.what_to_pitch as any;
+          const whatToPitch = wtp ? {
+            likelyPriorities: wtp.likely_priorities || wtp.likelyPriorities,
+            recommendedAngle: wtp.recommended_angle || wtp.recommendedAngle,
+            painPoints: wtp.pain_points || wtp.painPoints,
+          } : undefined;
+
           return {
             id: genId('person'), accountId,
             name: c.name, title, company: companyName,
@@ -360,6 +368,7 @@ export function importTorpedoJson(
             avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
             careerTrack: c.career_track,
             recentPosts,
+            whatToPitch,
           };
         });
         updates.people = [...(updates.people || []), ...people];

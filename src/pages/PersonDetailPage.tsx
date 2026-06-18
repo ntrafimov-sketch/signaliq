@@ -95,14 +95,27 @@ export function PersonDetailPage() {
   };
 
   const influenceVariant = { High: 'high', Medium: 'medium', Low: 'low' } as const;
-  const opp = account.opportunitySummary;
   const careerTrack: CareerEntry[] = person.careerTrack ?? [];
 
-  // Build "What to Pitch" from opportunity data
+  // Use person-specific what_to_pitch if available, fallback to account-level opportunitySummary
+  const wtp = person.whatToPitch;
+  const opp = account.opportunitySummary;
   const pitchItems = [
-    opp?.recommendedAngle && { icon: <Target className="w-4 h-4 text-indigo-500" />, label: 'Recommended Angle', text: opp.recommendedAngle },
-    opp?.likelyPriorities && { icon: <Lightbulb className="w-4 h-4 text-amber-500" />, label: 'Likely Priorities', text: opp.likelyPriorities },
-    opp?.potentialPainPoints && { icon: <AlertCircle className="w-4 h-4 text-red-400" />, label: 'Pain Points', text: opp.potentialPainPoints },
+    (wtp?.recommendedAngle || opp?.recommendedAngle) && {
+      icon: <Target className="w-4 h-4 text-indigo-500" />,
+      label: 'Recommended Angle',
+      text: wtp?.recommendedAngle || opp?.recommendedAngle || '',
+    },
+    (wtp?.likelyPriorities || opp?.likelyPriorities) && {
+      icon: <Lightbulb className="w-4 h-4 text-amber-500" />,
+      label: 'Likely Priorities',
+      text: wtp?.likelyPriorities || opp?.likelyPriorities || '',
+    },
+    (wtp?.painPoints || opp?.potentialPainPoints) && {
+      icon: <AlertCircle className="w-4 h-4 text-red-400" />,
+      label: 'Pain Points',
+      text: wtp?.painPoints || opp?.potentialPainPoints || '',
+    },
   ].filter(Boolean) as { icon: React.ReactNode; label: string; text: string }[];
 
   return (
