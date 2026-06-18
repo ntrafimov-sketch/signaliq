@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Download, RefreshCw,
@@ -12,6 +12,7 @@ import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { MetricChart } from '../components/MetricChart';
 import { SignalCategoryBadge, ConfidenceBadge } from '../components/SignalBadge';
 import { useStore } from '../store/useStore';
+import { importTorpedoJson } from '../services/importTorpedo';
 import { cn } from '../lib/utils';
 import type { Person, Signal, SignalCategory } from '../types';
 
@@ -55,11 +56,14 @@ const SIGNAL_CATEGORIES: Array<SignalCategory | 'All'> = ['All', 'Revenue', 'Com
 export function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { accounts } = useStore();
+  const { accounts, updateAccount } = useStore();
   const account = accounts.find(a => a.id === id);
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
   const [expandedDept, setExpandedDept] = useState<string | null>('Engineering');
   const [signalCategory, setSignalCategory] = useState<SignalCategory | 'All'>('All');
+  const [showJsonPaste, setShowJsonPaste] = useState(false);
+  const [jsonPasteError, setJsonPasteError] = useState('');
+  const jsonTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   if (!account) {
     return (
@@ -136,7 +140,9 @@ export function AccountDetailPage() {
             <ScoreRingLarge score={account.score} tier={account.scoreLabel} />
             <div className="flex flex-col gap-2">
               <Button variant="secondary" size="sm"><Download className="w-3.5 h-3.5" />Export</Button>
-              <Button variant="secondary" size="sm"><RefreshCw className="w-3.5 h-3.5" />Refresh</Button>
+              <Button variant="secondary" size="sm" onClick={() => { setShowJsonPaste(true); setJsonPasteError(''); }}>
+                <RefreshCw className="w-3.5 h-3.5" />Paste JSON
+              </Button>
             </div>
           </div>
         </div>
@@ -159,6 +165,43 @@ export function AccountDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* JSON Paste Modal */}
+      {showJsonPaste && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col gap-4 p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-gray-900">Paste Torpedo JSON</h2>
+              <button onClick={() => setShowJsonPaste(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+            </div>
+            <p className="text-sm text-gray-500">Paste the full JSON array from the research agent to update this account.</p>
+            <textarea
+              ref={jsonTextareaRef}
+              className="w-full h-64 rounded-xl border border-gray-200 p-3 text-xs font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+              placeholder='[{"type":"company_intel","data":{...}}, ...]'
+            />
+            {jsonPasteError && <p className="text-sm text-red-500">{jsonPasteError}</p>}
+            <div className="flex gap-3 justify-end">
+              <Button variant="secondary" size="sm" onClick={() => setShowJsonPaste(false)}>Cancel</Button>
+              <Button size="sm" onClick={() => {
+                try {
+                  const raw = jsonTextareaRef.current?.value || '';
+                  const parsed = JSON.parse(raw);
+                  const arr = Array.isArray(parsed) ? parsed : Object.values(parsed as Record<string, unknown>);
+                  const updates = importTorpedoJson(arr as Parameters<typeof importTorpedoJson>[0], account.id, account.company_name);
+                  updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
+                  setShowJsonPaste(false);
+                  setJsonPasteError('');
+                } catch (e) {
+                  setJsonPasteError(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+                }
+              }}>
+                Import
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pill tabs */}
       <div className="flex items-center gap-2">

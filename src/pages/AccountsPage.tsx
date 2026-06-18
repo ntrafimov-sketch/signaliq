@@ -331,6 +331,11 @@ export function AccountsPage() {
             adIntelligence: updates.adIntelligence,
             revenueHistory: updates.revenueHistory,
             downloadHistory: updates.downloadHistory,
+            news: updates.news,
+            investmentHistory: updates.investmentHistory,
+            paywallAnalysis: updates.paywallAnalysis,
+            paywallScreenshot: updates.paywallScreenshot,
+            departmentIntel: updates.departmentIntel,
           };
           console.log('[webhook] creating new account', newAccount.company_name, newAccount.id);
           addAccounts([newAccount]);
