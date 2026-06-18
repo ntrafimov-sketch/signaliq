@@ -16,7 +16,8 @@ const API_KEY = process.env.WEBHOOK_API_KEY || 'signaliq-dev-key';
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.text({ type: 'text/plain', limit: '10mb' }));
 
 // Connected browser clients
 const clients = new Set<WebSocket>();
@@ -60,9 +61,21 @@ app.post('/api/enrich', (req, res) => {
     account_id = intel?.data?.domain || `account-${Date.now()}`;
     company_name = intel?.data?.name || 'Unknown';
   } else {
-    data = body.data;
-    account_id = body.account_id;
-    company_name = body.company_name;
+    // data field may be a stringified JSON array — parse it
+    const rawData = body.data;
+    if (typeof rawData === 'string') {
+      try { data = JSON.parse(rawData); } catch { data = []; }
+    } else {
+      data = rawData;
+    }
+    account_id = body.account_id || body.domain || `account-${Date.now()}`;
+    company_name = body.company_name || body.name || 'Unknown';
+  }
+
+  console.log('[server] received body keys:', Object.keys(body));
+  console.log('[server] data type:', typeof data, 'isArray:', Array.isArray(data), 'length:', Array.isArray(data) ? data.length : 'n/a');
+  if (Array.isArray(data)) {
+    console.log('[server] entry types:', data.map((e: { type?: string }) => e?.type));
   }
 
   if (!data) {

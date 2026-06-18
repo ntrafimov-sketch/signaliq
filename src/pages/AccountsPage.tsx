@@ -295,13 +295,19 @@ export function AccountsPage() {
 
         console.log('[webhook] torpedoData type:', typeof torpedoData, Array.isArray(torpedoData));
         // Clay sometimes sends an object instead of array — wrap it
-        const safeData: unknown[] = Array.isArray(torpedoData)
-          ? torpedoData
-          : torpedoData && typeof torpedoData === 'object'
-          ? Object.values(torpedoData as Record<string, unknown>)
+        // Clay sometimes sends data as a stringified JSON string — parse it
+        let parsed = torpedoData;
+        if (typeof torpedoData === 'string') {
+          try { parsed = JSON.parse(torpedoData); } catch { parsed = []; }
+        }
+        const safeData: unknown[] = Array.isArray(parsed)
+          ? parsed
+          : parsed && typeof parsed === 'object'
+          ? Object.values(parsed as Record<string, unknown>)
           : [];
         const updates = importTorpedoJson(safeData as Parameters<typeof importTorpedoJson>[0], baseId, baseName);
         const entryTypes = (safeData as {type?:string}[]).map((e: {type?:string}) => e?.type);
+        console.log('[webhook] raw torpedoData type:', typeof torpedoData, Array.isArray(torpedoData));
         console.log('[webhook] parsed entry types:', entryTypes);
         console.log('[webhook] updates keys with data:', Object.entries(updates).filter(([,v]) => v !== undefined).map(([k]) => k));
 
