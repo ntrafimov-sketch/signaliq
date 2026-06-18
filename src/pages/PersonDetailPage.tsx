@@ -1,39 +1,56 @@
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, MapPin, Clock, ExternalLink, Copy, Send, RefreshCw, Mail, Briefcase,
-  ChevronRight, Calendar, Sparkles, Loader2, ExternalLink as LinkIcon
+  ArrowLeft, ExternalLink, Copy, Send, RefreshCw, Mail,
+  Sparkles, Loader2, ChevronRight, Target, Lightbulb, AlertCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
-import { SignalCategoryBadge } from '../components/SignalBadge';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { generateOutreachSequence, isClaudeConfigured } from '../services/claude';
-import type { OutreachMessage } from '../types';
+import type { OutreachMessage, CareerEntry } from '../types';
 
 type TabType = 'All' | 'Email' | 'LinkedIn';
 
-const outreachTypeIcon: Record<string, React.ReactNode> = {
-  Email: <Mail className="w-4 h-4" />,
-  LinkedIn: <ExternalLink className="w-4 h-4" />,
-  'Follow-up': <Send className="w-4 h-4" />,
-};
+function CompanyLogo({ company }: { company: string }) {
+  const [failed, setFailed] = useState(false);
+  const domain = company.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+inc$|\s+llc$|\s+corp$|\s+ltd$/,'')
+    .trim()
+    .replace(/\s+/g, '') + '.com';
+  if (!failed) {
+    return (
+      <img
+        src={`https://logo.clearbit.com/${domain}`}
+        alt={company}
+        onError={() => setFailed(true)}
+        className="w-8 h-8 rounded-lg object-contain bg-white border border-gray-100"
+      />
+    );
+  }
+  return (
+    <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600">
+      {company[0]}
+    </div>
+  );
+}
 
 export function PersonDetailPage() {
   const { id, personId } = useParams<{ id: string; personId: string }>();
   const navigate = useNavigate();
   const { accounts, updateAccount } = useStore();
   const account = accounts.find(a => a.id === id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const person = (account as any)?.people?.find((p: any) => p.id === personId);
   const [activeTab, setActiveTab] = useState<TabType>('All');
   const [copied, setCopied] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
-  // Stored sequence for this person
   const storedSequence: OutreachMessage[] = person?.sequence ?? [];
   const [messages, setMessages] = useState<OutreachMessage[]>(storedSequence);
 
@@ -53,8 +70,6 @@ export function PersonDetailPage() {
     return true;
   });
 
-  const signals = account.signals.slice(0, 14);
-
   const handleCopy = (msgId: string, text: string) => {
     navigator.clipboard.writeText(text).catch(() => {});
     setCopied(msgId);
@@ -67,37 +82,37 @@ export function PersonDetailPage() {
     try {
       const sequence = await generateOutreachSequence(account, person, account.signals);
       setMessages(sequence);
-      // Persist on person object inside account
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const updatedPeople = (account.people ?? []).map((p: any) =>
         p.id === personId ? { ...p, sequence } : p
       );
       updateAccount(account.id, { people: updatedPeople });
-    } catch (e: any) {
-      setGenerateError(e.message ?? 'Generation failed');
+    } catch (e: unknown) {
+      setGenerateError(e instanceof Error ? e.message : 'Generation failed');
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleSendToAmplemarket = () => {
-    // Copy all emails to clipboard and open Amplemarket
-    const allText = messages
-      .map(m => `--- ${m.type} (${m.style}) ---\n${m.subject ? `Subject: ${m.subject}\n\n` : ''}${m.body}`)
-      .join('\n\n');
-    navigator.clipboard.writeText(allText).catch(() => {});
-    window.open('https://app.amplemarket.com/sequences', '_blank');
-  };
-
   const influenceVariant = { High: 'high', Medium: 'medium', Low: 'low' } as const;
+  const opp = account.opportunitySummary;
+  const careerTrack: CareerEntry[] = person.careerTrack ?? [];
+
+  // Build "What to Pitch" from opportunity data
+  const pitchItems = [
+    opp?.recommendedAngle && { icon: <Target className="w-4 h-4 text-indigo-500" />, label: 'Recommended Angle', text: opp.recommendedAngle },
+    opp?.likelyPriorities && { icon: <Lightbulb className="w-4 h-4 text-amber-500" />, label: 'Likely Priorities', text: opp.likelyPriorities },
+    opp?.potentialPainPoints && { icon: <AlertCircle className="w-4 h-4 text-red-400" />, label: 'Pain Points', text: opp.potentialPainPoints },
+  ].filter(Boolean) as { icon: React.ReactNode; label: string; text: string }[];
 
   return (
     <div className="space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-slate-400">
-        <Link to="/accounts" className="hover:text-slate-600">Accounts</Link>
-        <ChevronRight className="w-4 h-4" />
+        <Link to="/accounts" className="hover:text-slate-600">Companies</Link>
+        <ChevronRight className="w-3.5 h-3.5" />
         <Link to={`/accounts/${id}`} className="hover:text-slate-600">{account.company_name}</Link>
-        <ChevronRight className="w-4 h-4" />
+        <ChevronRight className="w-3.5 h-3.5" />
         <span className="text-slate-700">{person.name}</span>
       </div>
 
@@ -106,253 +121,228 @@ export function PersonDetailPage() {
         Back to {account.company_name}
       </Link>
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Avatar name={person.name} size="xl" color={person.avatarColor} />
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-xl font-semibold text-slate-900">{person.name}</h1>
-              <Badge variant={influenceVariant[person.influence as keyof typeof influenceVariant]}>
-                {person.influence} influence
-              </Badge>
-            </div>
-            <p className="text-slate-600 mt-0.5 text-sm">{person.title} · {person.company}</p>
-            <div className="flex items-center gap-4 mt-1.5 flex-wrap text-sm text-slate-500">
-              <span className="flex items-center gap-1"><Briefcase className="w-3.5 h-3.5" />{person.department}</span>
-              <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{person.location}</span>
-              <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{person.tenure} tenure</span>
-              {person.linkedin && (
-                <a href={person.linkedin} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700">
-                  <ExternalLink className="w-3.5 h-3.5" />LinkedIn
-                </a>
-              )}
+      {/* Header card */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          {/* Left: avatar + name */}
+          <div className="flex items-center gap-4">
+            <Avatar name={person.name} size="xl" color={person.avatarColor} />
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">{person.name}</h1>
+              <p className="text-sm text-gray-500 mt-0.5">{person.title} · {account.company_name}</p>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <Badge variant={influenceVariant[person.influence as keyof typeof influenceVariant]}>
+                  {person.influence} influence
+                </Badge>
+                {person.department && <Badge variant="default">{person.department}</Badge>}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex gap-2 flex-shrink-0">
-          {messages.length > 0 && (
-            <Button variant="secondary" size="sm" onClick={handleGenerate} disabled={generating}>
-              <RefreshCw className={cn('w-3.5 h-3.5', generating && 'animate-spin')} />
-              Regenerate
-            </Button>
-          )}
-          {messages.length > 0 ? (
-            <Button variant="primary" size="sm" onClick={handleSendToAmplemarket}>
-              <LinkIcon className="w-3.5 h-3.5" />
-              Send sequence
-            </Button>
-          ) : (
+          {/* Actions */}
+          <div className="flex gap-2 flex-shrink-0">
+            {messages.length > 0 && (
+              <Button variant="secondary" size="sm" onClick={handleGenerate} disabled={generating}>
+                <RefreshCw className={cn('w-3.5 h-3.5', generating && 'animate-spin')} />
+                Regenerate
+              </Button>
+            )}
             <Button
               variant="primary" size="sm"
-              onClick={handleGenerate}
-              disabled={generating || !isClaudeConfigured()}
-              title={!isClaudeConfigured() ? 'Add VITE_ANTHROPIC_API_KEY to .env' : ''}
+              onClick={messages.length > 0 ? () => window.open('https://app.amplemarket.com/sequences', '_blank') : handleGenerate}
+              disabled={generating || (!messages.length && !isClaudeConfigured())}
             >
               {generating ? (
                 <><Loader2 className="w-3.5 h-3.5 animate-spin" />Generating...</>
+              ) : messages.length > 0 ? (
+                <><Send className="w-3.5 h-3.5" />Send sequence</>
               ) : (
                 <><Sparkles className="w-3.5 h-3.5" />Generate Sequence</>
               )}
             </Button>
-          )}
+          </div>
+        </div>
+
+        {/* Info grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-gray-100">
+          {[
+            { label: 'Title', value: person.title },
+            { label: 'Location', value: person.location },
+            { label: 'Email', value: person.email, href: person.email ? `mailto:${person.email}` : undefined },
+            { label: 'LinkedIn', value: person.linkedin ? 'View profile' : '—', href: person.linkedin || undefined },
+          ].map(item => (
+            <div key={item.label} className="bg-gray-50 rounded-lg px-3 py-2.5">
+              <p className="text-xs text-gray-400 font-medium mb-0.5">{item.label}</p>
+              {item.href ? (
+                <a href={item.href} target="_blank" rel="noopener noreferrer"
+                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 truncate">
+                  {item.label === 'LinkedIn' ? <><ExternalLink className="w-3 h-3 flex-shrink-0" />{item.value}</> : item.value}
+                </a>
+              ) : (
+                <p className="text-sm text-gray-700 font-medium truncate">{item.value || '—'}</p>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Career track */}
-      {(person.careerTrack ?? []).length > 0 && (
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Career Track</h2>
-          </CardHeader>
-          <div className="divide-y divide-slate-100">
-            {(person.careerTrack ?? []).map((job: import('../types').CareerEntry, i: number) => (
-              <div key={i} className="px-5 py-3.5 flex items-start gap-3">
-                <div className="flex flex-col items-center mt-1">
-                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${i === 0 ? 'bg-indigo-500' : 'bg-slate-200'}`} />
-                  {i < (person.careerTrack ?? []).length - 1 && <div className="w-0.5 h-full bg-slate-100 mt-1 min-h-4" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{job.title}</p>
-                      <p className="text-sm text-slate-600">{job.company}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xs text-slate-400">{job.start} → {job.end}</p>
-                      <p className="text-xs text-slate-400">{job.duration}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+      {generateError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{generateError}</div>
       )}
 
       {/* Bio */}
       {person.bio && (
         <Card>
-          <CardHeader><h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Bio</h2></CardHeader>
           <CardContent>
-            <p className="text-sm text-slate-600 leading-relaxed">{person.bio}</p>
+            <p className="text-sm text-gray-600 leading-relaxed">{person.bio}</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Error */}
-      {generateError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-          {generateError}
-        </div>
+      {/* Two-column: What to Pitch + Past Experience */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* What to Pitch */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-indigo-500" />
+              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">What to Pitch</h2>
+            </div>
+          </CardHeader>
+          {pitchItems.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-gray-400">
+              No pitch strategy available
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {pitchItems.map((item, i) => (
+                <div key={i} className="px-5 py-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    {item.icon}
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{item.label}</p>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Generate sequence CTA if no messages */}
+          {messages.length === 0 && !generating && isClaudeConfigured() && (
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+              <button onClick={handleGenerate}
+                className="w-full flex items-center justify-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                <Sparkles className="w-4 h-4" />
+                Generate personalized outreach sequence
+              </button>
+            </div>
+          )}
+        </Card>
+
+        {/* Past Experience */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Past Experience</h2>
+          </CardHeader>
+          {careerTrack.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-gray-400">No career data available</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {careerTrack.map((job: CareerEntry, i: number) => (
+                <div key={i} className="px-5 py-4">
+                  <div className="flex items-start gap-3">
+                    <CompanyLogo company={job.company} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{job.company}</p>
+                          <p className="text-xs text-gray-400">{job.start} – {job.end} · {job.duration}</p>
+                        </div>
+                        {i === 0 && (
+                          <span className="text-xs bg-green-50 text-green-700 border border-green-100 px-2 py-0.5 rounded-full flex-shrink-0">Current</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{job.title}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Outreach sequence */}
+      {(messages.length > 0 || generating) && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-gray-500" />
+                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Outreach Sequence</h2>
+              </div>
+              <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+                {(['All', 'Email', 'LinkedIn'] as TabType[]).map(tab => (
+                  <button key={tab} onClick={() => setActiveTab(tab)}
+                    className={cn('px-3 py-1.5 text-sm font-medium transition-colors',
+                      activeTab === tab ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50')}>
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardHeader>
+
+          {generating ? (
+            <div className="px-5 py-12 text-center">
+              <Loader2 className="w-8 h-8 text-indigo-400 mx-auto mb-3 animate-spin" />
+              <p className="text-slate-600 font-medium">Claude is writing your sequence...</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {filteredMessages.map(msg => (
+                <div key={msg.id} className="px-5 py-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase bg-gray-100 px-2 py-0.5 rounded">{msg.type}</span>
+                      <span className="text-xs text-gray-400 italic">{msg.style}</span>
+                    </div>
+                    <Button variant="ghost" size="sm"
+                      onClick={() => handleCopy(msg.id, (msg.subject ? `Subject: ${msg.subject}\n\n` : '') + msg.body)}>
+                      <Copy className="w-3.5 h-3.5" />
+                      {copied === msg.id ? 'Copied!' : 'Copy'}
+                    </Button>
+                  </div>
+                  {msg.subject && (
+                    <p className="text-xs text-gray-400 mb-1">Subject: <span className="text-gray-700 font-medium">{msg.subject}</span></p>
+                  )}
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{msg.body}</pre>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       )}
 
-      {/* Empty state */}
+      {/* Empty sequence state */}
       {messages.length === 0 && !generating && (
         <Card>
           <CardContent>
-            <div className="py-12 text-center">
+            <div className="py-10 text-center">
               <Sparkles className="w-10 h-10 text-indigo-300 mx-auto mb-3" />
-              <p className="text-slate-600 font-medium mb-1">No sequence yet</p>
+              <p className="text-slate-600 font-medium mb-1">No outreach sequence yet</p>
               <p className="text-sm text-slate-400 mb-4">
                 {isClaudeConfigured()
-                  ? `Generate a personalized outreach sequence for ${person.name} based on ${account.signals.length} signals`
+                  ? `Generate a personalized sequence for ${person.name} based on ${account.signals.length} signals`
                   : 'Add VITE_ANTHROPIC_API_KEY to .env to enable AI sequence generation'}
               </p>
               {isClaudeConfigured() && (
                 <Button variant="primary" size="sm" onClick={handleGenerate}>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Generate Sequence
+                  <Sparkles className="w-3.5 h-3.5" />Generate Sequence
                 </Button>
               )}
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Generating loader */}
-      {generating && (
-        <Card>
-          <CardContent>
-            <div className="py-12 text-center">
-              <Loader2 className="w-10 h-10 text-indigo-400 mx-auto mb-3 animate-spin" />
-              <p className="text-slate-600 font-medium">Claude is writing your sequence...</p>
-              <p className="text-sm text-slate-400 mt-1">Analyzing {account.signals.length} signals for {person.name}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Content */}
-      {messages.length > 0 && !generating && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Left: Outreach */}
-          <div className="lg:col-span-2 space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-slate-900">Crafted outreach</h2>
-                <div className="flex border border-slate-200 rounded-lg overflow-hidden">
-                  {(['All', 'Email', 'LinkedIn'] as TabType[]).map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)}
-                      className={cn('px-3 py-1.5 text-sm font-medium transition-colors',
-                        activeTab === tab ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50')}>
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {filteredMessages.map(msg => (
-                  <Card key={msg.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-500">{outreachTypeIcon[msg.type]}</span>
-                          <span className="font-medium text-slate-800 text-sm">{msg.type}</span>
-                          <span className="text-slate-300">·</span>
-                          <span className="text-sm text-slate-500 italic">{msg.style}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm"
-                            onClick={() => handleCopy(msg.id, (msg.subject ? `Subject: ${msg.subject}\n\n` : '') + msg.body)}>
-                            <Copy className="w-3.5 h-3.5" />
-                            {copied === msg.id ? 'Copied!' : 'Copy'}
-                          </Button>
-                          <Button variant="secondary" size="sm" onClick={() => window.open('https://app.amplemarket.com', '_blank')}>
-                            <Send className="w-3.5 h-3.5" />
-                            Send
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {msg.subject && (
-                        <div className="mb-3">
-                          <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Subject</p>
-                          <p className="text-sm font-medium text-slate-800">{msg.subject}</p>
-                        </div>
-                      )}
-                      <pre className="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">{msg.body}</pre>
-                      {msg.basedOn.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-slate-100">
-                          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-2">Based on</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {msg.basedOn.map(signal => (
-                              <span key={signal} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs border border-slate-200">
-                                {signal}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Right sidebar */}
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Why This Messaging</h2>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  {person.name} is {person.title} at {person.company} with {person.influence.toLowerCase()} buying influence.
-                  {account.whyMatters ? ` ${account.whyMatters}` : ` Sequence personalized using ${account.signals.length} signals.`}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Signals Used</h2>
-                  <span className="text-xs text-slate-400">{signals.length}</span>
-                </div>
-              </CardHeader>
-              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-                {signals.map(signal => (
-                  <div key={signal.id} className="px-5 py-3">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <SignalCategoryBadge category={signal.category} />
-                      <div className="flex items-center gap-1 text-xs text-slate-400 flex-shrink-0">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(signal.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-400 mb-0.5">via {signal.source}</p>
-                    <p className="text-sm font-medium text-slate-800">{signal.title}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        </div>
       )}
     </div>
   );
