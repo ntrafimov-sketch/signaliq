@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Settings, Zap, BarChart2, List, Users, Activity, LogOut, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuthStore } from '../store/useAuthStore';
+import { useStore } from '../store/useStore';
 
 const navItems = [
   { label: 'Accounts', path: '/accounts', icon: Users },
@@ -20,6 +21,7 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.currentUser);
   const logout = useAuthStore((s) => s.logout);
+  const profile = useStore((s) => s.profile);
 
   const [collapsed, setCollapsed] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -130,9 +132,14 @@ export function Layout({ children }: LayoutProps) {
               )}
               title={collapsed ? currentUser?.name : undefined}
             >
-              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-600 to-violet-800 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
-                {initials}
-              </div>
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} alt={profile.name}
+                  className="w-7 h-7 rounded-xl object-cover flex-shrink-0" />
+              ) : (
+                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-600 to-violet-800 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                  {initials}
+                </div>
+              )}
               {!collapsed && (
                 <>
                   <div className="flex-1 min-w-0">
