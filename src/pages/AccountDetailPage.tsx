@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Download, RefreshCw,
   Calendar, MessageSquare, Briefcase, ChevronDown, ChevronRight, ExternalLink,
-  Newspaper, TrendingUp, ImagePlus
+  Newspaper, TrendingUp, ImagePlus, Snowflake, Sun, Leaf, Flower2
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -20,6 +20,66 @@ import type { Person, Signal, SignalCategory } from '../types';
 type Tab = 'Overview' | 'Signals' | 'News' | 'Paywall' | 'People' | 'HubSpot' | 'Ad Channels';
 
 const TABS: Tab[] = ['Overview', 'Signals', 'News', 'Paywall', 'People', 'HubSpot', 'Ad Channels'];
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+interface SeasonTrend {
+  peakMonths: string[];
+  dipMonths: string[];
+  peakPct: number;
+  dipPct: number;
+  label: string;
+  season: 'winter' | 'spring' | 'summer' | 'fall' | 'mixed';
+}
+
+function detectSeasonality(history: Array<{ date: string; ios: number; android: number }>): SeasonTrend | null {
+  if (history.length < 8) return null;
+
+  // Aggregate by calendar month (0-11) across all years
+  const byMonth: Record<number, number[]> = {};
+  for (const p of history) {
+    const m = new Date(p.date).getMonth();
+    if (!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push((p.ios || 0) + (p.android || 0));
+  }
+
+  const monthAvgs: { month: number; avg: number }[] = Object.entries(byMonth).map(([m, vals]) => ({
+    month: Number(m),
+    avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+  }));
+
+  if (monthAvgs.length < 6) return null;
+
+  const overall = monthAvgs.reduce((a, b) => a + b.avg, 0) / monthAvgs.length;
+  if (overall === 0) return null;
+
+  const peaks = monthAvgs.filter(m => m.avg > overall * 1.2).sort((a, b) => b.avg - a.avg);
+  const dips  = monthAvgs.filter(m => m.avg < overall * 0.8).sort((a, b) => a.avg - b.avg);
+
+  if (peaks.length === 0) return null;
+
+  const peakPct = Math.round(((peaks[0].avg / overall) - 1) * 100);
+  const dipPct  = dips.length ? Math.round((1 - dips[0].avg / overall) * 100) : 0;
+
+  const peakMonths = peaks.slice(0, 3).map(p => MONTH_NAMES[p.month]);
+  const dipMonths  = dips.slice(0, 3).map(p => MONTH_NAMES[p.month]);
+
+  // Determine season label
+  const topMonth = peaks[0].month;
+  const season: SeasonTrend['season'] =
+    [11, 0, 1].includes(topMonth) ? 'winter' :
+    [2, 3, 4].includes(topMonth)  ? 'spring' :
+    [5, 6, 7].includes(topMonth)  ? 'summer' :
+    [8, 9, 10].includes(topMonth) ? 'fall'   : 'mixed';
+
+  const seasonLabel =
+    season === 'winter' ? 'Winter peak' :
+    season === 'spring' ? 'Spring peak' :
+    season === 'summer' ? 'Summer peak' :
+    season === 'fall'   ? 'Fall peak'   : 'Seasonal peak';
+
+  return { peakMonths, dipMonths, peakPct, dipPct, label: seasonLabel, season };
+}
 
 function ScoreRingLarge({ score, tier }: { score: number; tier: string }) {
   const r = 26, circ = 2 * Math.PI * r;
@@ -347,6 +407,45 @@ export function AccountDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Seasonality card */}
+            {(() => {
+              const trend = detectSeasonality(account.downloadHistory || []);
+              if (!trend) return null;
+              const SeasonIcon = trend.season === 'winter' ? Snowflake : trend.season === 'spring' ? Flower2 : trend.season === 'summer' ? Sun : Leaf;
+              const iconColor = trend.season === 'winter' ? 'text-blue-400' : trend.season === 'spring' ? 'text-pink-400' : trend.season === 'summer' ? 'text-amber-400' : 'text-orange-400';
+              const bgColor = trend.season === 'winter' ? 'bg-blue-50' : trend.season === 'spring' ? 'bg-pink-50' : trend.season === 'summer' ? 'bg-amber-50' : 'bg-orange-50';
+              const textColor = trend.season === 'winter' ? 'text-blue-700' : trend.season === 'spring' ? 'text-pink-700' : trend.season === 'summer' ? 'text-amber-700' : 'text-orange-700';
+              return (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <SeasonIcon className={cn('w-4 h-4', iconColor)} />
+                      <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Seasonality</h2>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className={cn('rounded-xl px-4 py-3 flex items-center justify-between', bgColor)}>
+                      <div>
+                        <p className={cn('text-sm font-bold', textColor)}>{trend.label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{trend.peakMonths.join(', ')}</p>
+                      </div>
+                      <span className={cn('text-lg font-extrabold', textColor)}>+{trend.peakPct}%</span>
+                    </div>
+                    {trend.dipMonths.length > 0 && (
+                      <div className="rounded-xl px-4 py-3 flex items-center justify-between bg-gray-50">
+                        <div>
+                          <p className="text-sm font-bold text-gray-600">Low season</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{trend.dipMonths.join(', ')}</p>
+                        </div>
+                        <span className="text-lg font-extrabold text-gray-400">−{trend.dipPct}%</span>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400">Based on {account.downloadHistory!.length} months of install data</p>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {/* Investment card */}
             <Card>
