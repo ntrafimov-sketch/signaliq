@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 interface AvatarProps {
   name: string;
   email?: string;
+  linkedin?: string;
   color?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
@@ -17,17 +18,29 @@ const sizeClasses = {
   xl: 'w-16 h-16 text-2xl',
 };
 
-export function Avatar({ name, email, color, size = 'md', className }: AvatarProps) {
-  const [imgFailed, setImgFailed] = useState(false);
+function linkedinUsername(url?: string): string | null {
+  if (!url) return null;
+  const m = url.match(/linkedin\.com\/in\/([^/?#]+)/i);
+  return m ? m[1] : null;
+}
+
+export function Avatar({ name, email, linkedin, color, size = 'md', className }: AvatarProps) {
+  const liUsername = linkedinUsername(linkedin);
+  const srcs = [
+    liUsername ? `https://unavatar.io/linkedin/${liUsername}?fallback=404` : null,
+    email ? `https://unavatar.io/${encodeURIComponent(email)}?fallback=404` : null,
+  ].filter(Boolean) as string[];
+
+  const [stage, setStage] = useState(0);
   const initial = name.charAt(0).toUpperCase();
   const bgColor = color || generateColor(name);
 
-  if (email && !imgFailed) {
+  if (stage < srcs.length) {
     return (
       <img
-        src={`https://unavatar.io/${encodeURIComponent(email)}?fallback=404`}
+        src={srcs[stage]}
         alt={name}
-        onError={() => setImgFailed(true)}
+        onError={() => setStage(s => s + 1)}
         className={cn('rounded-xl object-cover flex-shrink-0', sizeClasses[size], className)}
       />
     );
