@@ -33,38 +33,57 @@ interface SeasonTrend {
 }
 
 function detectSeasonality(history: Array<{ date: string; ios: number; android: number }>): SeasonTrend | null {
-  if (history.length < 8) return null;
+  if (history.length < 16) return null; // need at least ~16 months to span 2 years
 
-  // Aggregate by calendar month (0-11) across all years
-  const byMonth: Record<number, number[]> = {};
+  // Group by year → month
+  const byYear: Record<number, Record<number, number>> = {};
   for (const p of history) {
-    const m = new Date(p.date).getMonth();
-    if (!byMonth[m]) byMonth[m] = [];
-    byMonth[m].push((p.ios || 0) + (p.android || 0));
+    const d = new Date(p.date);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    if (!byYear[year]) byYear[year] = {};
+    byYear[year][month] = (byYear[year][month] || 0) + (p.ios || 0) + (p.android || 0);
   }
 
-  const monthAvgs: { month: number; avg: number }[] = Object.entries(byMonth).map(([m, vals]) => ({
-    month: Number(m),
-    avg: vals.reduce((a, b) => a + b, 0) / vals.length,
-  }));
+  const years = Object.keys(byYear).map(Number);
+  if (years.length < 2) return null; // need at least 2 full years for recurring pattern
+
+  // Normalize each year: express each month as % of that year's average
+  // This removes absolute growth trends and isolates seasonality
+  const monthRelative: Record<number, number[]> = {};
+  for (const year of years) {
+    const vals = Object.values(byYear[year]);
+    const yearAvg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    if (yearAvg === 0) continue;
+    for (const [m, v] of Object.entries(byYear[year])) {
+      const month = Number(m);
+      if (!monthRelative[month]) monthRelative[month] = [];
+      monthRelative[month].push(v / yearAvg);
+    }
+  }
+
+  // Only keep months with data in 2+ years (recurring)
+  const monthAvgs = Object.entries(monthRelative)
+    .filter(([, vals]) => vals.length >= 2)
+    .map(([m, vals]) => ({
+      month: Number(m),
+      avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+    }));
 
   if (monthAvgs.length < 6) return null;
 
-  const overall = monthAvgs.reduce((a, b) => a + b.avg, 0) / monthAvgs.length;
-  if (overall === 0) return null;
-
-  const peaks = monthAvgs.filter(m => m.avg > overall * 1.2).sort((a, b) => b.avg - a.avg);
-  const dips  = monthAvgs.filter(m => m.avg < overall * 0.8).sort((a, b) => a.avg - b.avg);
+  const overall = 1.0; // normalized baseline
+  const peaks = monthAvgs.filter(m => m.avg > overall * 1.15).sort((a, b) => b.avg - a.avg);
+  const dips  = monthAvgs.filter(m => m.avg < overall * 0.85).sort((a, b) => a.avg - b.avg);
 
   if (peaks.length === 0) return null;
 
-  const peakPct = Math.round(((peaks[0].avg / overall) - 1) * 100);
-  const dipPct  = dips.length ? Math.round((1 - dips[0].avg / overall) * 100) : 0;
+  const peakPct = Math.round((peaks[0].avg - 1) * 100);
+  const dipPct  = dips.length ? Math.round((1 - dips[0].avg) * 100) : 0;
 
   const peakMonths = peaks.slice(0, 3).map(p => MONTH_NAMES[p.month]);
   const dipMonths  = dips.slice(0, 3).map(p => MONTH_NAMES[p.month]);
 
-  // Determine season label
   const topMonth = peaks[0].month;
   const season: SeasonTrend['season'] =
     [11, 0, 1].includes(topMonth) ? 'winter' :
