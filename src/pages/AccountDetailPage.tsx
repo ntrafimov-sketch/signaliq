@@ -33,7 +33,7 @@ interface SeasonTrend {
 }
 
 function detectSeasonality(history: Array<{ date: string; ios: number; android: number }>): SeasonTrend | null {
-  if (history.length < 16) return null; // need at least ~16 months to span 2 years
+  if (history.length < 12) return null;
 
   // Group by year → month
   const byYear: Record<number, Record<number, number>> = {};
@@ -46,10 +46,11 @@ function detectSeasonality(history: Array<{ date: string; ios: number; android: 
   }
 
   const years = Object.keys(byYear).map(Number);
-  if (years.length < 2) return null; // need at least 2 full years for recurring pattern
+  if (years.length < 2) return null;
 
-  // Normalize each year: express each month as % of that year's average
+  // Normalize each year: express each month as ratio to that year's average
   // This removes absolute growth trends and isolates seasonality
+  // One-time spikes (e.g. news event) show as high in 1 year but average out across years
   const monthRelative: Record<number, number[]> = {};
   for (const year of years) {
     const vals = Object.values(byYear[year]);
@@ -62,19 +63,16 @@ function detectSeasonality(history: Array<{ date: string; ios: number; android: 
     }
   }
 
-  // Only keep months with data in 2+ years (recurring)
-  const monthAvgs = Object.entries(monthRelative)
-    .filter(([, vals]) => vals.length >= 2)
-    .map(([m, vals]) => ({
-      month: Number(m),
-      avg: vals.reduce((a, b) => a + b, 0) / vals.length,
-    }));
+  const monthAvgs = Object.entries(monthRelative).map(([m, vals]) => ({
+    month: Number(m),
+    avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+    years: vals.length,
+  }));
 
   if (monthAvgs.length < 6) return null;
 
-  const overall = 1.0; // normalized baseline
-  const peaks = monthAvgs.filter(m => m.avg > overall * 1.15).sort((a, b) => b.avg - a.avg);
-  const dips  = monthAvgs.filter(m => m.avg < overall * 0.85).sort((a, b) => a.avg - b.avg);
+  const peaks = monthAvgs.filter(m => m.avg > 1.15).sort((a, b) => b.avg - a.avg);
+  const dips  = monthAvgs.filter(m => m.avg < 0.85).sort((a, b) => a.avg - b.avg);
 
   if (peaks.length === 0) return null;
 
