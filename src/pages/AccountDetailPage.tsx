@@ -640,7 +640,7 @@ export function AccountDetailPage() {
                 <Link key={person.id} to={`/accounts/${account.id}/people/${person.id}`}>
                 <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
                   <div className="flex items-start gap-3">
-                    <Avatar name={person.name} size="md" color={person.avatarColor} />
+                    <Avatar name={person.name} email={person.email} size="md" color={person.avatarColor} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold text-gray-900">{person.name}</p>

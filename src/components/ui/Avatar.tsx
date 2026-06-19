@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { cn } from '../../lib/utils';
 
 interface AvatarProps {
   name: string;
+  email?: string;
   color?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
@@ -15,9 +17,21 @@ const sizeClasses = {
   xl: 'w-16 h-16 text-2xl',
 };
 
-export function Avatar({ name, color, size = 'md', className }: AvatarProps) {
+export function Avatar({ name, email, color, size = 'md', className }: AvatarProps) {
+  const [imgFailed, setImgFailed] = useState(false);
   const initial = name.charAt(0).toUpperCase();
   const bgColor = color || generateColor(name);
+
+  if (email && !imgFailed) {
+    return (
+      <img
+        src={`https://unavatar.io/${encodeURIComponent(email)}?fallback=404`}
+        alt={name}
+        onError={() => setImgFailed(true)}
+        className={cn('rounded-xl object-cover flex-shrink-0', sizeClasses[size], className)}
+      />
+    );
+  }
 
   return (
     <div
