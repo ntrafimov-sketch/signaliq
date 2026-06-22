@@ -353,9 +353,13 @@ export function importTorpedoJson(
       case 'signals': {
         for (const s of entry.data as { signal: string; priority?: string; implication?: string; relevance?: string; detail?: string; why_now?: string }[]) {
           const impact = s.priority === 'HIGH' ? 'High' : s.priority === 'MEDIUM' ? 'Medium' : 'Low';
+          const sigText = (s.signal + ' ' + (s.detail || '') + ' ' + (s.implication || '')).toLowerCase();
+          const isHiring = /\b(hir(ing|ed?)|recruit|job posting|open role|head of|new (gm|cto|cpo|vp|director)|leadership (gap|vacuum)|building.*team|expanding.*team)\b/.test(sigText);
           signals.push({
             id: genId(), accountId, accountName: companyName,
-            type: 'Post mentioned specific keywords', category: 'Social', source: 'Research',
+            type: isHiring ? 'Hiring In Relevant Department' : 'Post mentioned specific keywords',
+            category: isHiring ? 'Hiring' : 'Social',
+            source: 'Research',
             date: today, confidence: 'High', impact: impact as 'High' | 'Medium' | 'Low',
             title: s.signal,
             description: s.detail || s.implication || s.relevance || s.why_now || '',
