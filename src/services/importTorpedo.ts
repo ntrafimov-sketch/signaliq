@@ -9,6 +9,12 @@ function genId(prefix = 'sig') {
 
 const AVATAR_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6', '#10b981'];
 
+const HIRING_RE = /\b(hir(ing|ed?)|recruit|job posting|open role|new (gm|cto|cpo|vp|director)|leadership (gap|vacuum)|building.*team|expanding.*team|head of.*role)\b/i;
+
+function isHiringSignal(text: string): boolean {
+  return HIRING_RE.test(text);
+}
+
 function fmt(n: number) {
   return n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${Math.round(n / 1_000)}K` : `$${Math.round(n)}`;
 }
@@ -239,23 +245,39 @@ export function importTorpedoJson(
       case 'ad_intelligence': {
         const d = entry.data;
         const ui = d.ua_interpretation || {};
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parsePlatform = (p: any) => p ? ({
+          activeChannels: p.active_channels || [],
+          primaryChannels: p.primary_channels || [],
+          impressionsByChannel: p.impressions_by_channel || [],
+          topGeos: p.top_geos || [],
+          totalImpressionsScore: p.total_impressions_score || 0,
+        }) : undefined;
+
+        // Support both flat format (old) and per-platform format (ios/android keys)
+        const hasPerPlatform = d.ios || d.android;
         updates.adIntelligence = {
-          activeChannels: d.active_channels || [],
-          primaryChannels: d.primary_channels || [],
+          activeChannels: d.active_channels || d.ios?.active_channels || d.android?.active_channels || [],
+          primaryChannels: d.primary_channels || d.ios?.primary_channels || [],
           creativeFormats: d.creative_formats || [],
           spendTrend: d.spend_trend || '',
           uaSophistication: ui.ua_sophistication || '',
           asaPresent: ui.asa_present || false,
           mmpGap: ui.mmp_gap || '',
           paywallTension: ui.paywall_tension || '',
+          ios: hasPerPlatform ? parsePlatform(d.ios) : parsePlatform(d),
+          android: parsePlatform(d.android),
         };
-        const channels = (d.active_channels || []).join(', ');
-        if (channels) {
+
+        const allChannels = [...(d.ios?.active_channels || d.active_channels || []), ...(d.android?.active_channels || [])];
+        const uniqueChannels = [...new Set(allChannels)];
+        if (uniqueChannels.length) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Using Meta/TT', category: 'Ad Spend', source: 'Research',
             date: today, confidence: 'High', impact: 'High',
-            title: `Active on ${d.channel_count || d.active_channels?.length || '?'} UA channels: ${channels}`,
+            title: `Active on ${uniqueChannels.length} UA channels: ${uniqueChannels.join(', ')}`,
             description: ui.ua_sophistication || '',
           });
         }
@@ -353,12 +375,12 @@ export function importTorpedoJson(
       case 'signals': {
         for (const s of entry.data as { signal: string; priority?: string; implication?: string; relevance?: string; detail?: string; why_now?: string }[]) {
           const impact = s.priority === 'HIGH' ? 'High' : s.priority === 'MEDIUM' ? 'Medium' : 'Low';
-          const sigText = (s.signal + ' ' + (s.detail || '') + ' ' + (s.implication || '')).toLowerCase();
-          const isHiring = /\b(hir(ing|ed?)|recruit|job posting|open role|head of|new (gm|cto|cpo|vp|director)|leadership (gap|vacuum)|building.*team|expanding.*team)\b/.test(sigText);
+          const sigText = `${s.signal} ${s.detail || ''} ${s.implication || ''}`;
+          const hiring = isHiringSignal(sigText);
           signals.push({
             id: genId(), accountId, accountName: companyName,
-            type: isHiring ? 'Hiring In Relevant Department' : 'Post mentioned specific keywords',
-            category: isHiring ? 'Hiring' : 'Social',
+            type: hiring ? 'Hiring In Relevant Department' : 'Post mentioned specific keywords',
+            category: hiring ? 'Hiring' : 'Social',
             source: 'Research',
             date: today, confidence: 'High', impact: impact as 'High' | 'Medium' | 'Low',
             title: s.signal,

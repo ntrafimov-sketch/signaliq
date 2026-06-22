@@ -896,71 +896,98 @@ export function AccountDetailPage() {
             <Card><div className="px-5 py-10 text-center text-sm text-gray-400">No ad intelligence data</div></Card>
           ) : (
             <>
-              {/* Active channels */}
-              <Card>
-                <CardHeader>
-                  <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Active UA Channels</h2>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {account.adIntelligence.activeChannels.map(ch => (
-                      <span key={ch} className={`px-3 py-1 rounded-full text-sm font-medium border ${
-                        account.adIntelligence!.primaryChannels.includes(ch)
-                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                          : 'bg-gray-50 border-gray-200 text-gray-600'
-                      }`}>
-                        {account.adIntelligence!.primaryChannels.includes(ch) ? '★ ' : ''}{ch}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-gray-400 font-medium">Creative Formats</p>
-                      <p className="text-sm text-gray-700 mt-0.5">{account.adIntelligence.creativeFormats.join(', ') || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 font-medium">Spend Trend</p>
-                      <p className={`text-sm font-medium mt-0.5 ${account.adIntelligence.spendTrend === 'scaling' ? 'text-green-600' : 'text-gray-700'}`}>
-                        {account.adIntelligence.spendTrend || '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 font-medium">ASA Present</p>
-                      <p className={`text-sm font-medium mt-0.5 ${account.adIntelligence.asaPresent ? 'text-green-600' : 'text-gray-500'}`}>
-                        {account.adIntelligence.asaPresent ? 'Yes' : 'No'}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Per-platform impression breakdown */}
+              {(['ios', 'android'] as const).map(platform => {
+                const p = account.adIntelligence![platform];
+                if (!p || !p.impressionsByChannel?.length) return null;
+                const maxScore = Math.max(...p.impressionsByChannel.map(r => r.score));
+                return (
+                  <Card key={platform}>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                          {platform === 'ios' ? '🍎 iOS' : '🤖 Android'} — Impressions by Channel
+                        </h2>
+                        {p.topGeos.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            {p.topGeos.slice(0, 5).map(g => (
+                              <span key={g} className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs font-medium">{g}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2.5">
+                      {p.impressionsByChannel.map(row => {
+                        const pct = maxScore > 0 ? (row.score / maxScore) * 100 : 0;
+                        const isPrimary = p.primaryChannels.includes(row.channel);
+                        return (
+                          <div key={row.channel}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`text-sm font-medium ${isPrimary ? 'text-violet-700' : 'text-gray-700'}`}>
+                                {isPrimary ? '★ ' : ''}{row.channel}
+                              </span>
+                              <span className="text-xs text-gray-400">{(row.score / 1_000_000).toFixed(1)}M impr.</span>
+                            </div>
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${isPrimary ? 'bg-violet-500' : 'bg-gray-300'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+
+              {/* ASA + meta info */}
+              <div className="grid grid-cols-3 gap-3">
+                <Card>
+                  <CardContent className="py-4 text-center">
+                    <p className="text-xs text-gray-400 font-medium mb-1">ASA Present</p>
+                    <p className={`text-sm font-bold ${account.adIntelligence.asaPresent ? 'text-green-600' : 'text-red-500'}`}>
+                      {account.adIntelligence.asaPresent ? 'Yes' : 'No'}
+                    </p>
+                  </CardContent>
+                </Card>
+                {account.adIntelligence.spendTrend && (
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-gray-400 font-medium mb-1">Spend Trend</p>
+                      <p className="text-sm font-bold text-gray-700">{account.adIntelligence.spendTrend}</p>
+                    </CardContent>
+                  </Card>
+                )}
+                {account.adIntelligence.creativeFormats?.length > 0 && (
+                  <Card>
+                    <CardContent className="py-4 text-center">
+                      <p className="text-xs text-gray-400 font-medium mb-1">Formats</p>
+                      <p className="text-sm font-bold text-gray-700">{account.adIntelligence.creativeFormats.join(', ')}</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
 
               {/* UA Sophistication */}
               {account.adIntelligence.uaSophistication && (
                 <Card>
                   <CardHeader><h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">UA Sophistication</h2></CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.uaSophistication}</p>
-                  </CardContent>
+                  <CardContent><p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.uaSophistication}</p></CardContent>
                 </Card>
               )}
-
-              {/* MMP Gap */}
               {account.adIntelligence.mmpGap && (
                 <Card>
                   <CardHeader><h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">MMP / Measurement</h2></CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.mmpGap}</p>
-                  </CardContent>
+                  <CardContent><p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.mmpGap}</p></CardContent>
                 </Card>
               )}
-
-              {/* Paywall tension */}
               {account.adIntelligence.paywallTension && (
                 <Card>
                   <CardHeader><h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Paywall & Revenue Tension</h2></CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.paywallTension}</p>
-                  </CardContent>
+                  <CardContent><p className="text-sm text-gray-600 leading-relaxed">{account.adIntelligence.paywallTension}</p></CardContent>
                 </Card>
               )}
             </>

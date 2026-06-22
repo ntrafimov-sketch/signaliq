@@ -119,6 +119,19 @@ export interface Person {
   whatToPitch?: { likelyPriorities?: string; recommendedAngle?: string; painPoints?: string };
 }
 
+export interface AdChannelRow {
+  channel: string;
+  score: number;
+}
+
+export interface AdPlatform {
+  activeChannels: string[];
+  primaryChannels: string[];
+  impressionsByChannel: AdChannelRow[];
+  topGeos: string[];
+  totalImpressionsScore: number;
+}
+
 export interface AdIntelligence {
   activeChannels: string[];
   primaryChannels: string[];
@@ -128,6 +141,8 @@ export interface AdIntelligence {
   asaPresent: boolean;
   mmpGap: string;
   paywallTension: string;
+  ios?: AdPlatform;
+  android?: AdPlatform;
 }
 
 export interface OutreachMessage {
