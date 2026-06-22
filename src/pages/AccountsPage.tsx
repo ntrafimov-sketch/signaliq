@@ -284,8 +284,8 @@ export function AccountsPage() {
   accountsRef.current = accounts;
 
   useEffect(() => {
-    const normalizeDomain = (d: string) =>
-      d.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+    const normalizeDomain = (d: string | undefined | null) =>
+      (d || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
 
     const disconnect = connectWebhookListener((accountId, companyName, torpedoData) => {
       try {
