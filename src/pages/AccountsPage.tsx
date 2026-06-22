@@ -290,11 +290,13 @@ export function AccountsPage() {
     const disconnect = connectWebhookListener((accountId, companyName, torpedoData) => {
       try {
         const current = accountsRef.current;
-        const account = current.find(a =>
-          a.id === accountId ||
-          normalizeDomain(a.domain) === normalizeDomain(accountId) ||
-          a.company_name.toLowerCase().trim() === companyName.toLowerCase().trim()
-        );
+        const account = current.find(a => {
+          try {
+            return a.id === accountId ||
+              normalizeDomain(a.domain) === normalizeDomain(accountId) ||
+              (a.company_name || '').toLowerCase().trim() === (companyName || '').toLowerCase().trim();
+          } catch { return false; }
+        });
         const baseId = account ? account.id : `webhook-${Date.now()}`;
         const baseName = account ? account.company_name : companyName;
 
