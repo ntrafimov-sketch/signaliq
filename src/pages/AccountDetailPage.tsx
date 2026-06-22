@@ -900,7 +900,7 @@ export function AccountDetailPage() {
               {(['ios', 'android'] as const).map(platform => {
                 const p = account.adIntelligence![platform];
                 if (!p || !p.impressionsByChannel?.length) return null;
-                const maxScore = Math.max(...p.impressionsByChannel.map(r => r.score));
+                const maxScore = Math.max(...p.impressionsByChannel.map(r => (r.score ?? (r as any).impressions ?? 0)));
                 return (
                   <Card key={platform}>
                     <CardHeader>
@@ -919,7 +919,8 @@ export function AccountDetailPage() {
                     </CardHeader>
                     <CardContent className="space-y-2.5">
                       {p.impressionsByChannel.map(row => {
-                        const pct = maxScore > 0 ? (row.score / maxScore) * 100 : 0;
+                        const val = row.score ?? (row as any).impressions ?? 0;
+                        const pct = maxScore > 0 ? (val / maxScore) * 100 : 0;
                         const isPrimary = p.primaryChannels.includes(row.channel);
                         return (
                           <div key={row.channel}>
@@ -927,7 +928,7 @@ export function AccountDetailPage() {
                               <span className={`text-sm font-medium ${isPrimary ? 'text-violet-700' : 'text-gray-700'}`}>
                                 {isPrimary ? '★ ' : ''}{row.channel}
                               </span>
-                              <span className="text-xs text-gray-400">{(row.score / 1_000_000).toFixed(1)}M impr.</span>
+                              <span className="text-xs text-gray-400">{(val / 1_000_000).toFixed(1)}M impr.</span>
                             </div>
                             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                               <div
