@@ -250,9 +250,13 @@ export function importTorpedoJson(
         const parsePlatform = (p: any) => p ? ({
           activeChannels: p.active_channels || [],
           primaryChannels: p.primary_channels || [],
-          impressionsByChannel: p.impressions_by_channel || [],
+          // rows may have { channel, impressions } or { channel, score } — normalise to score
+          impressionsByChannel: (p.impressions_by_channel || []).map((r: any) => ({
+            channel: r.channel,
+            score: r.score ?? r.impressions ?? 0,
+          })),
           topGeos: p.top_geos || [],
-          totalImpressionsScore: p.total_impressions_score || 0,
+          totalImpressionsScore: p.total_impressions_score ?? p.total_impressions ?? 0,
         }) : undefined;
 
         // Support both flat format (old) and per-platform format (ios/android keys)
