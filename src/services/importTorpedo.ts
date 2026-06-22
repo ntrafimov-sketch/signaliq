@@ -219,8 +219,8 @@ export function importTorpedoJson(
               ...((entry.data.ios || []) as { name: string }[]),
               ...((entry.data.android || []) as { name: string }[]),
             ].filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i);
-        const paywall = sdkList.filter(s => PAYWALL.some(p => s.name.toLowerCase().includes(p)));
-        const lifecycle = sdkList.filter(s => LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
+        const paywall = sdkList.filter(s => s.name && PAYWALL.some(p => s.name.toLowerCase().includes(p)));
+        const lifecycle = sdkList.filter(s => s.name && LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
         if (paywall.length) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
@@ -547,7 +547,8 @@ export function importTorpedoJson(
     });
     const seen = new Set<string>();
     updates.people = sorted.filter(p => {
-      const key = p.name.toLowerCase().trim();
+      const key = (p.name || '').toLowerCase().trim();
+      if (!key) return false;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -569,7 +570,7 @@ export function importTorpedoJson(
 }
 
 function guessDepartment(title: string): string {
-  const t = title.toLowerCase();
+  const t = (title || '').toLowerCase();
   if (t.includes('ceo') || t.includes('coo') || t.includes('founder') || t.includes('president')) return 'Leadership';
   if (t.includes('cto') || t.includes('engineer') || t.includes('tech')) return 'Engineering';
   if (t.includes('product') || t.includes('pm')) return 'Product';
@@ -580,7 +581,7 @@ function guessDepartment(title: string): string {
 }
 
 function guessInfluence(title: string): string {
-  const t = title.toLowerCase();
+  const t = (title || '').toLowerCase();
   if (t.includes('ceo') || t.includes('coo') || t.includes('cto') || t.includes('cpo') || t.includes('cdo') || t.includes('cfo') || t.includes('founder') || t.includes('head of') || t.includes('vp') || t.includes('director')) return 'High';
   if (t.includes('lead') || t.includes('senior') || t.includes('manager')) return 'Medium';
   return 'Low';
