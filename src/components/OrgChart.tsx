@@ -41,9 +41,10 @@ function findParent(node: RawNode, all: TreeNode[]): TreeNode | null {
     const title = candidate.title.toLowerCase();
     if (rt === title || rt.startsWith(title) || rt.includes(` ${title}`) ) return candidate;
   }
-  // 5. Match by title words (≥ 3 chars) — handles "Engineering Manager", "CPO"
+  // 5. Match by title words — only meaningful role words (≥ 6 chars), skip company/brand names
+  const SKIP_WORDS = new Set(['simple', 'invoice', 'everpro', 'evercommerce', 'remote', 'likely', 'unclear', 'inferred', 'unknown', 'incoming', 'markets', 'solutions', 'software', 'mobile', 'specialist', 'mobile']);
   for (const candidate of all) {
-    const titleWords = candidate.title.toLowerCase().split(/[\s/,()]+/).filter(w => w.length >= 3);
+    const titleWords = candidate.title.toLowerCase().split(/[\s/,()—]+/).filter(w => w.length >= 6 && !SKIP_WORDS.has(w));
     for (const word of titleWords) {
       if (rt.includes(word)) return candidate;
     }
