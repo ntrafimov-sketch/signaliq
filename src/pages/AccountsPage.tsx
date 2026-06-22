@@ -269,6 +269,7 @@ export function AccountsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [wsLastMsg, setWsLastMsg] = useState<string | null>(null);
+  const [webhookError, setWebhookError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = subscribeWsStatus((status, msg) => {
@@ -360,6 +361,8 @@ export function AccountsPage() {
         }
       } catch (err) {
         console.error('[webhook] handler error', err);
+        setWebhookError(`Failed to process ${companyName}: ${err instanceof Error ? err.message : String(err)}`);
+        setTimeout(() => setWebhookError(null), 8000);
       }
     });
     return disconnect;
@@ -447,6 +450,7 @@ export function AccountsPage() {
            `Disconnected · ${getWsUrl()}`}
         </span>
         {wsLastMsg && <span className="text-green-600 font-medium">· {wsLastMsg}</span>}
+        {webhookError && <span className="text-red-500 font-medium">· ⚠ {webhookError}</span>}
       </div>
 
       {/* Upload success banner */}
