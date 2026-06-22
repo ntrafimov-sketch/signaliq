@@ -161,7 +161,33 @@ export function importTorpedoJson(
       }
 
       case 'org_chart': {
-        updates.orgChart = entry.data;
+        const d = entry.data;
+        const STANDARD = ['c_level', 'vp_director', 'manager_ic', 'unknown'];
+        // If already in standard format — use as-is
+        if (STANDARD.some(k => d[k])) {
+          updates.orgChart = d;
+        } else {
+          // Flatten all arrays from any key structure into standard buckets by title
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const allPeople: any[] = Object.values(d).flat();
+          const c_level: typeof allPeople = [];
+          const vp_director: typeof allPeople = [];
+          const manager_ic: typeof allPeople = [];
+          const unknown: typeof allPeople = [];
+          for (const p of allPeople) {
+            const t = (p.title || '').toLowerCase();
+            if (t.includes('ceo') || t.includes('coo') || t.includes('cto') || t.includes('cpo') || t.includes('cfo') || t.includes('svp') || t.includes('evp') || t.includes('chief') || t.includes('founder')) {
+              c_level.push(p);
+            } else if (t.includes('vp') || t.includes('vice president') || t.includes('director') || t.includes('head of') || t.includes('gm') || t.includes('general manager') || t.includes('president')) {
+              vp_director.push(p);
+            } else if (t.includes('manager') || t.includes('lead') || t.includes('senior') || t.includes('engineer') || t.includes('analyst') || t.includes('specialist') || t.includes('designer') || t.includes('pm') || t.includes('product')) {
+              manager_ic.push(p);
+            } else {
+              unknown.push(p);
+            }
+          }
+          updates.orgChart = { c_level, vp_director, manager_ic, unknown };
+        }
         break;
       }
 
