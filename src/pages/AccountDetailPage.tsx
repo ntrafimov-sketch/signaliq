@@ -269,7 +269,13 @@ export function AccountDetailPage() {
                   const raw = jsonTextareaRef.current?.value || '';
                   const parsed = JSON.parse(raw);
                   const arr = Array.isArray(parsed) ? parsed : Object.values(parsed as Record<string, unknown>);
+                  console.log('[paste] entry types:', (arr as {type?:string}[]).map(e => e?.type));
+                  console.log('[paste] email_collection entry:', (arr as {type?:string;data?:unknown}[]).find(e => e?.type === 'email_collection'));
+                  console.log('[paste] jobs entry:', (arr as {type?:string;data?:unknown}[]).find(e => e?.type === 'jobs' || e?.type === 'job_openings'));
                   const updates = importTorpedoJson(arr as Parameters<typeof importTorpedoJson>[0], account.id, account.company_name);
+                  console.log('[paste] updates.emailCollection:', updates.emailCollection);
+                  console.log('[paste] updates.jobOpenings:', updates.jobOpenings);
+                  console.log('[paste] updates.signals hiring:', (updates.signals || []).filter(s => s.category === 'Hiring'));
                   updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
                   setShowJsonPaste(false);
                   setJsonPasteError('');
