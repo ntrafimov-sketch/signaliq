@@ -507,7 +507,7 @@ export function importTorpedoJson(
 
         const angles = (d.angles || []) as { angle: string; strength?: string; detail?: string; rationale?: string; pitch_framing?: string; hook?: string }[];
         if (angles.length) {
-          updates.whyKeywords = angles.map(a => a.angle.split(' ').slice(0, 4).join(' '));
+          updates.whyKeywords = angles.map(a => (a.angle || '').split(' ').slice(0, 4).join(' ')).filter(Boolean);
         }
 
         const top = angles[0];

@@ -91,7 +91,7 @@ const LEVEL_BORDER: Record<string, string> = {
 };
 
 function NodeCard({ node, accountId }: { node: TreeNode; accountId: string }) {
-  const initials = node.name.split(' ').map(n => n[0]).slice(0, 2).join('');
+  const initials = (node.name || '').split(' ').map(n => n[0]).slice(0, 2).join('');
   const borderColor = LEVEL_BORDER[node.level] ?? '#d1d5db';
 
   const inner = (
