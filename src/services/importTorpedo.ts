@@ -339,21 +339,40 @@ export function importTorpedoJson(
 
       case 'email_collection': {
         const d = entry.data;
-        const enabled = d.email_collection === true || d.enabled === true || d.has_email_collection === true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const entryAny = entry as any;
         updates.emailCollection = {
-          enabled,
-          tool: d.tool || d.esp || d.email_tool || '',
-          form_location: d.form_location || d.location || '',
-          incentive: d.incentive || '',
-          notes: d.notes || d.summary || '',
+          emailPattern: d.email_pattern || '',
+          confirmedCount: d.total_emails_confirmed || 0,
+          missingCount: d.total_emails_missing || 0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          contacts: Array.isArray(d.contacts) ? d.contacts.map((c: any) => ({
+            name: c.name || '',
+            email: c.email || null,
+            title: c.title || '',
+            hubspot_status: c.hubspot_status || '',
+            outreach_priority: c.outreach_priority || 0,
+          })) : [],
         };
-        if (enabled) {
+        // Update existing people with confirmed emails
+        if (Array.isArray(d.contacts) && updates.people) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const ec of d.contacts as any[]) {
+            if (!ec.email) continue;
+            const match = updates.people.find(p =>
+              (p.name || '').toLowerCase().includes((ec.name || '').split(' ')[0].toLowerCase())
+            );
+            if (match) match.email = ec.email;
+          }
+        }
+        // signal: email_collection confirmed (top level flag)
+        if (entryAny.email_collection === true || d.total_emails_confirmed > 0) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Using W2A', category: 'Ad Spend', source: 'Research',
             date: today, confidence: 'High', impact: 'Medium',
-            title: `Email collection active${d.tool ? ` via ${d.tool}` : ''}`,
-            description: [d.form_location || d.location, d.incentive, d.notes || d.summary].filter(Boolean).join(' · '),
+            title: `${d.total_emails_confirmed || 0} confirmed contact email${(d.total_emails_confirmed || 0) !== 1 ? 's' : ''}`,
+            description: d.email_pattern || '',
           });
         }
         break;
@@ -361,24 +380,33 @@ export function importTorpedoJson(
 
       case 'jobs':
       case 'job_openings': {
-        const jobs = Array.isArray(entry.data) ? entry.data : [];
-        if (jobs.length) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const d = entry.data;
+        // data can be array directly or object with relevant_roles/jobs array
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const jobs: any[] = Array.isArray(d) ? d
+          : Array.isArray(d.relevant_roles) ? d.relevant_roles
+          : Array.isArray(d.jobs) ? d.jobs
+          : Array.isArray(d.openings) ? d.openings
+          : [];
+        const totalRoles = d.total_open_roles || jobs.length;
+        if (totalRoles > 0 || jobs.length > 0) {
           updates.jobOpenings = jobs.map((j: any) => ({
             title: j.title || j.job_title || j.role || '',
-            department: j.department || j.function || '',
+            department: j.department || j.function || j.team || '',
             location: j.location || '',
             url: j.url || j.job_url || '',
             posted: j.posted || j.date || j.posted_at || '',
+            salary: j.salary || '',
+            relevance: j.adapty_relevance || j.relevance || '',
+            signal: j.signal || '',
           }));
-          // Always generate a hiring signal
-          const depts = [...new Set(jobs.map((j: any) => j.department || j.function).filter(Boolean))];
+          const depts = [...new Set(jobs.map((j: any) => j.department || j.function || j.team).filter(Boolean))] as string[];
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Research',
             date: today, confidence: 'High', impact: 'High',
-            title: `${jobs.length} open role${jobs.length > 1 ? 's' : ''}${depts.length ? ` · ${depts.slice(0, 3).join(', ')}` : ''}`,
-            description: jobs.slice(0, 5).map((j: any) => j.title || j.job_title || j.role).filter(Boolean).join(', '),
+            title: `${totalRoles} open role${totalRoles !== 1 ? 's' : ''}${depts.length ? ` · ${depts.slice(0, 3).join(', ')}` : ''}`,
+            description: d.summary || d.hiring_interpretation || jobs.slice(0, 3).map((j: any) => j.title).filter(Boolean).join(', '),
           });
         }
         break;
@@ -552,86 +580,24 @@ export function importTorpedoJson(
         if (d.situation_summary) whyParts.push(d.situation_summary);
         if (whyParts.length) updates.whyMatters = whyParts.join(' · ');
 
-        const angles = (d.angles || []) as { angle: string; strength?: string; detail?: string; rationale?: string; pitch_framing?: string; hook?: string }[];
+        const angles = (d.angles || []) as { angle?: string; angle_name?: string; strength?: string; detail?: string; rationale?: string; pitch_framing?: string; hook?: string; target_contacts?: string[] }[];
         if (angles.length) {
-          updates.whyKeywords = angles.map(a => (a.angle || '').split(' ').slice(0, 4).join(' ')).filter(Boolean);
+          updates.whyKeywords = angles.map(a => ((a.angle_name || a.angle) || '').split(' ').slice(0, 4).join(' ')).filter(Boolean);
         }
 
         const top = angles[0];
         const second = angles[1];
         updates.opportunitySummary = {
-          businessTrigger: top ? (top.angle || '') : (d.situation_summary || ''),
+          businessTrigger: top ? (top.angle_name || top.angle || '') : (d.situation_summary || ''),
           likelyPriorities: top ? (top.rationale || top.detail || top.hook || '') : '',
           potentialPainPoints: second ? (second.rationale || second.detail || second.hook || '') : (d.caution || ''),
-          recommendedAngle: d.recommended_sequence || (top ? `${top.angle}: ${(top.hook || top.rationale || top.pitch_framing || '').slice(0, 300)}` : ''),
+          recommendedAngle: d.recommended_sequence || (top ? `${top.angle_name || top.angle || ''}: ${(top.hook || top.rationale || top.pitch_framing || '').slice(0, 300)}` : ''),
         };
         break;
       }
     }
   }
 
-  // Second pass: scan ALL entries for email_collection + jobs fields
-  // regardless of entry type name, so we catch them wherever they appear
-  for (const entry of entries) {
-    if (!entry || entry.data === undefined) continue;
-    const d = entry.data;
-
-    // email_collection — accept boolean OR object
-    if (!updates.emailCollection) {
-      const raw = d.email_collection ?? d.email_capture ?? d.email_signup;
-      if (raw !== undefined && raw !== null) {
-        const isObj = raw && typeof raw === 'object';
-        const enabled = isObj ? !!(raw.enabled ?? raw.active ?? raw.email_collection ?? true) : !!raw;
-        updates.emailCollection = {
-          enabled,
-          tool: isObj ? (raw.tool || raw.esp || raw.platform || '') : '',
-          form_location: isObj ? (raw.form_location || raw.location || '') : '',
-          incentive: isObj ? (raw.incentive || '') : '',
-          notes: isObj ? (raw.notes || raw.summary || '') : '',
-        };
-        if (enabled) {
-          signals.push({
-            id: genId(), accountId, accountName: companyName,
-            type: 'Using W2A', category: 'Ad Spend', source: 'Research',
-            date: today, confidence: 'High', impact: 'Medium',
-            title: `Email collection active${isObj && raw.tool ? ` via ${raw.tool}` : ''}`,
-            description: isObj ? [raw.form_location || raw.location, raw.incentive, raw.notes || raw.summary].filter(Boolean).join(' · ') : '',
-          });
-        }
-      }
-    }
-
-    // jobs — accept array of job objects on any field name
-    if (!updates.jobOpenings) {
-      const jobsRaw = Array.isArray(d) && entry.type?.match(/job|hiring|role|opening/i) ? d
-        : Array.isArray(d.jobs) ? d.jobs
-        : Array.isArray(d.job_openings) ? d.job_openings
-        : Array.isArray(d.open_roles) ? d.open_roles
-        : Array.isArray(d.openings) ? d.openings
-        : Array.isArray(d.positions) ? d.positions
-        : null;
-      if (jobsRaw && jobsRaw.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        updates.jobOpenings = jobsRaw.map((j: any) => ({
-          title: j.title || j.job_title || j.role || j.position || '',
-          department: j.department || j.function || j.team || '',
-          location: j.location || '',
-          url: j.url || j.job_url || j.link || '',
-          posted: j.posted || j.date || j.posted_at || j.created_at || '',
-        }));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const depts = [...new Set(jobsRaw.map((j: any) => j.department || j.function || j.team).filter(Boolean))];
-        signals.push({
-          id: genId(), accountId, accountName: companyName,
-          type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Research',
-          date: today, confidence: 'High', impact: 'High',
-          title: `${jobsRaw.length} open role${jobsRaw.length > 1 ? 's' : ''}${depts.length ? ` · ${(depts as string[]).slice(0, 3).join(', ')}` : ''}`,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          description: jobsRaw.slice(0, 5).map((j: any) => j.title || j.job_title || j.role).filter(Boolean).join(', '),
-        });
-      }
-    }
-  }
 
   // Save chart time-series
   if (revByDate.size > 0) {

@@ -433,27 +433,38 @@ export function AccountDetailPage() {
                     <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center">
                       <span className="text-base">✉️</span>
                     </div>
-                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Email Collection</h2>
-                    <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${account.emailCollection.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {account.emailCollection.enabled ? 'Active' : 'Not detected'}
+                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Contact Emails</h2>
+                    <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                      {account.emailCollection.confirmedCount || 0} confirmed
                     </span>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    {account.emailCollection.tool && (
-                      <div><p className="text-xs text-gray-400 mb-0.5">Tool</p><p className="font-medium text-gray-800">{account.emailCollection.tool}</p></div>
-                    )}
-                    {account.emailCollection.form_location && (
-                      <div><p className="text-xs text-gray-400 mb-0.5">Location</p><p className="font-medium text-gray-800">{account.emailCollection.form_location}</p></div>
-                    )}
-                    {account.emailCollection.incentive && (
-                      <div className="col-span-2"><p className="text-xs text-gray-400 mb-0.5">Incentive</p><p className="font-medium text-gray-800">{account.emailCollection.incentive}</p></div>
-                    )}
-                    {account.emailCollection.notes && (
-                      <div className="col-span-2"><p className="text-xs text-gray-500 leading-relaxed">{account.emailCollection.notes}</p></div>
-                    )}
-                  </div>
+                <CardContent className="space-y-3">
+                  {account.emailCollection.emailPattern && (
+                    <p className="text-xs text-gray-500 font-mono bg-gray-50 px-3 py-1.5 rounded-lg">{account.emailCollection.emailPattern}</p>
+                  )}
+                  {account.emailCollection.contacts && account.emailCollection.contacts.length > 0 && (
+                    <div className="space-y-1.5">
+                      {account.emailCollection.contacts.sort((a, b) => (a.outreach_priority || 99) - (b.outreach_priority || 99)).map((c, i) => (
+                        <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">{c.name}</p>
+                            <p className="text-xs text-gray-400">{c.title}</p>
+                          </div>
+                          <div className="text-right">
+                            {c.email ? (
+                              <p className="text-xs font-mono text-violet-600">{c.email}</p>
+                            ) : (
+                              <p className="text-xs text-gray-300">no email</p>
+                            )}
+                            {c.hubspot_status && c.hubspot_status !== 'not_in_crm' && c.hubspot_status !== 'cold' && (
+                              <p className="text-xs text-green-600 font-medium">{c.hubspot_status.replace(/_/g, ' ')}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
