@@ -337,6 +337,53 @@ export function importTorpedoJson(
         break;
       }
 
+      case 'email_collection': {
+        const d = entry.data;
+        const enabled = d.email_collection === true || d.enabled === true || d.has_email_collection === true;
+        updates.emailCollection = {
+          enabled,
+          tool: d.tool || d.esp || d.email_tool || '',
+          form_location: d.form_location || d.location || '',
+          incentive: d.incentive || '',
+          notes: d.notes || d.summary || '',
+        };
+        if (enabled) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Using W2A', category: 'Ad Spend', source: 'Research',
+            date: today, confidence: 'High', impact: 'Medium',
+            title: `Email collection active${d.tool ? ` via ${d.tool}` : ''}`,
+            description: [d.form_location || d.location, d.incentive, d.notes || d.summary].filter(Boolean).join(' · '),
+          });
+        }
+        break;
+      }
+
+      case 'jobs':
+      case 'job_openings': {
+        const jobs = Array.isArray(entry.data) ? entry.data : [];
+        if (jobs.length) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          updates.jobOpenings = jobs.map((j: any) => ({
+            title: j.title || j.job_title || j.role || '',
+            department: j.department || j.function || '',
+            location: j.location || '',
+            url: j.url || j.job_url || '',
+            posted: j.posted || j.date || j.posted_at || '',
+          }));
+          // Always generate a hiring signal
+          const depts = [...new Set(jobs.map((j: any) => j.department || j.function).filter(Boolean))];
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Research',
+            date: today, confidence: 'High', impact: 'High',
+            title: `${jobs.length} open role${jobs.length > 1 ? 's' : ''}${depts.length ? ` · ${depts.slice(0, 3).join(', ')}` : ''}`,
+            description: jobs.slice(0, 5).map((j: any) => j.title || j.job_title || j.role).filter(Boolean).join(', '),
+          });
+        }
+        break;
+      }
+
       case 'hubspot_company_engagement': {
         const d = entry.data;
         const totals = d.company_totals || {};

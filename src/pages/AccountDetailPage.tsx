@@ -425,6 +425,39 @@ export function AccountDetailPage() {
               </Card>
             )}
 
+            {/* Email collection card */}
+            {account.emailCollection && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center">
+                      <span className="text-base">✉️</span>
+                    </div>
+                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Email Collection</h2>
+                    <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${account.emailCollection.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {account.emailCollection.enabled ? 'Active' : 'Not detected'}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {account.emailCollection.tool && (
+                      <div><p className="text-xs text-gray-400 mb-0.5">Tool</p><p className="font-medium text-gray-800">{account.emailCollection.tool}</p></div>
+                    )}
+                    {account.emailCollection.form_location && (
+                      <div><p className="text-xs text-gray-400 mb-0.5">Location</p><p className="font-medium text-gray-800">{account.emailCollection.form_location}</p></div>
+                    )}
+                    {account.emailCollection.incentive && (
+                      <div className="col-span-2"><p className="text-xs text-gray-400 mb-0.5">Incentive</p><p className="font-medium text-gray-800">{account.emailCollection.incentive}</p></div>
+                    )}
+                    {account.emailCollection.notes && (
+                      <div className="col-span-2"><p className="text-xs text-gray-500 leading-relaxed">{account.emailCollection.notes}</p></div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Seasonality card */}
             {(() => {
               const trend = detectSeasonality(account.downloadHistory || []);
@@ -943,6 +976,28 @@ export function AccountDetailPage() {
                   </Card>
                 );
               })}
+
+              {/* Fallback: flat active channels when no per-platform breakdown */}
+              {!account.adIntelligence!.ios?.impressionsByChannel?.length &&
+               !account.adIntelligence!.android?.impressionsByChannel?.length &&
+               account.adIntelligence!.activeChannels?.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">📡 Active Channels</h2>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {account.adIntelligence!.activeChannels.map(ch => (
+                        <span key={ch} className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          account.adIntelligence!.primaryChannels?.includes(ch)
+                            ? 'bg-violet-100 text-violet-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>{ch}</span>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* ASA + meta info */}
               <div className="grid grid-cols-3 gap-3">
