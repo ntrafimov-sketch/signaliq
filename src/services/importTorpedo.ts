@@ -570,6 +570,69 @@ export function importTorpedoJson(
     }
   }
 
+  // Second pass: scan ALL entries for email_collection + jobs fields
+  // regardless of entry type name, so we catch them wherever they appear
+  for (const entry of entries) {
+    if (!entry || entry.data === undefined) continue;
+    const d = entry.data;
+
+    // email_collection — accept boolean OR object
+    if (!updates.emailCollection) {
+      const raw = d.email_collection ?? d.email_capture ?? d.email_signup;
+      if (raw !== undefined && raw !== null) {
+        const isObj = raw && typeof raw === 'object';
+        const enabled = isObj ? !!(raw.enabled ?? raw.active ?? raw.email_collection ?? true) : !!raw;
+        updates.emailCollection = {
+          enabled,
+          tool: isObj ? (raw.tool || raw.esp || raw.platform || '') : '',
+          form_location: isObj ? (raw.form_location || raw.location || '') : '',
+          incentive: isObj ? (raw.incentive || '') : '',
+          notes: isObj ? (raw.notes || raw.summary || '') : '',
+        };
+        if (enabled) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Using W2A', category: 'Ad Spend', source: 'Research',
+            date: today, confidence: 'High', impact: 'Medium',
+            title: `Email collection active${isObj && raw.tool ? ` via ${raw.tool}` : ''}`,
+            description: isObj ? [raw.form_location || raw.location, raw.incentive, raw.notes || raw.summary].filter(Boolean).join(' · ') : '',
+          });
+        }
+      }
+    }
+
+    // jobs — accept array of job objects on any field name
+    if (!updates.jobOpenings) {
+      const jobsRaw = Array.isArray(d) && entry.type?.match(/job|hiring|role|opening/i) ? d
+        : Array.isArray(d.jobs) ? d.jobs
+        : Array.isArray(d.job_openings) ? d.job_openings
+        : Array.isArray(d.open_roles) ? d.open_roles
+        : Array.isArray(d.openings) ? d.openings
+        : Array.isArray(d.positions) ? d.positions
+        : null;
+      if (jobsRaw && jobsRaw.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        updates.jobOpenings = jobsRaw.map((j: any) => ({
+          title: j.title || j.job_title || j.role || j.position || '',
+          department: j.department || j.function || j.team || '',
+          location: j.location || '',
+          url: j.url || j.job_url || j.link || '',
+          posted: j.posted || j.date || j.posted_at || j.created_at || '',
+        }));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const depts = [...new Set(jobsRaw.map((j: any) => j.department || j.function || j.team).filter(Boolean))];
+        signals.push({
+          id: genId(), accountId, accountName: companyName,
+          type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Research',
+          date: today, confidence: 'High', impact: 'High',
+          title: `${jobsRaw.length} open role${jobsRaw.length > 1 ? 's' : ''}${depts.length ? ` · ${(depts as string[]).slice(0, 3).join(', ')}` : ''}`,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          description: jobsRaw.slice(0, 5).map((j: any) => j.title || j.job_title || j.role).filter(Boolean).join(', '),
+        });
+      }
+    }
+  }
+
   // Save chart time-series
   if (revByDate.size > 0) {
     updates.revenueHistory = Array.from(revByDate.entries())
