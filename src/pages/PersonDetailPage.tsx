@@ -10,7 +10,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { generateOutreachSequence, buildSequencePrompt, isClaudeConfigured } from '../services/claude';
+import { generateOutreachSequence, generateSequenceFromTorpedo, buildSequencePrompt, isClaudeConfigured } from '../services/claude';
 import { subscribeSequenceResult } from '../services/webhookListener';
 import type { OutreachMessage, CareerEntry } from '../types';
 
@@ -140,11 +140,13 @@ export function PersonDetailPage() {
       } catch { /* Clay unreachable */ }
     }
 
-    // 3. Try direct Claude API
+    // 3. Direct Claude API — torpedo JSON is primary, fallback to parsed account
     if (isClaudeConfigured()) {
       setGenerating(true);
       try {
-        const sequence = await generateOutreachSequence(account, person, account.signals);
+        const sequence = account.torpedoData?.length
+          ? await generateSequenceFromTorpedo(account.torpedoData, person.name)
+          : await generateOutreachSequence(account, person, account.signals);
         setMessages(sequence);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updatedPeople = (account.people ?? []).map((p: any) =>

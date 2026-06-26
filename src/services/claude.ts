@@ -102,6 +102,61 @@ Sign as [Your name] from Adapty.`;
 }
 
 // ---------------------------------------------------------------------------
+// Generate sequence from raw torpedo JSON + person name (primary path)
+// ---------------------------------------------------------------------------
+
+export async function generateSequenceFromTorpedo(
+  torpedoData: unknown[],
+  personName: string
+): Promise<OutreachMessage[]> {
+  if (!API_KEY) throw new Error('VITE_ANTHROPIC_API_KEY not set');
+
+  const userMessage = `Generate a 4-message outreach sequence for ${personName}.
+
+Here is the full account research data:
+${JSON.stringify(torpedoData, null, 2)}
+
+Instructions:
+- Find ${personName} in the "people" entries — use their title, department, bio, influence
+- Use "signals" entries to personalize each message
+- Use "strategy" entries for recommended angle and pain points
+- Use "company_intel" for company context
+- Reference specific signal titles in the basedOn fields
+- Sign as [Your name] from Adapty`;
+
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'x-api-key': API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+      'anthropic-dangerous-direct-browser-calls': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-8',
+      max_tokens: 2000,
+      thinking: { type: 'adaptive' },
+      system: ADAPTY_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Claude API error ${response.status}: ${err}`);
+  }
+
+  const data = await response.json();
+  const text = data.content?.find((b: { type: string }) => b.type === 'text')?.text ?? '';
+
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('Claude returned unexpected format');
+
+  const messages: OutreachMessage[] = JSON.parse(match[0]);
+  return messages.map((m, i) => ({ ...m, id: `gen-${Date.now()}-${i}` }));
+}
+
+// ---------------------------------------------------------------------------
 // Generate outreach sequence for a specific person
 // ---------------------------------------------------------------------------
 
