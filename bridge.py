@@ -57,11 +57,25 @@ end try
     subprocess.run(["osascript", "-e", script], check=True)
 
 
+CLAY_SEQUENCE_WEBHOOK = "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-5b3b2188-ad8b-4392-829d-5248bff64596"
+
 def trigger_sequence(data: dict) -> None:
-    """Send /cold-email-master prompt with person's name to Claude Desktop."""
+    """Send /cold-email-master prompt to Claude Desktop with POST instruction."""
     person = data.get("person", {})
+    account = data.get("account", {})
     name = person.get("name", "").strip()
-    prompt = f"/cold-email-master {name}"
+    account_id = account.get("id", data.get("account_id", ""))
+    person_id = person.get("id", data.get("person_id", ""))
+
+    prompt = f"""/cold-email-master {name}
+
+After generating the sequence JSON, send it to SignalIQ by running this curl command:
+
+curl -s -X POST "{CLAY_SEQUENCE_WEBHOOK}" \\
+  -H "Content-Type: application/json" \\
+  -d '{{"account_id":"{account_id}","person_id":"{person_id}","result":SEQUENCE_JSON_HERE}}'
+
+Replace SEQUENCE_JSON_HERE with the full JSON object you generated (no quotes around it)."""
 
     paste_prompt_to_claude(prompt)
 
