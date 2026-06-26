@@ -415,27 +415,31 @@ export function importTorpedoJson(
       case 'hubspot_company_engagement': {
         const d = entry.data;
         const totals = d.company_totals || {};
-        if (totals.contacts_found || totals.total_sessions) {
+        const contactsFound = totals.contacts_found || totals.total_contacts_found || 0;
+        if (contactsFound || totals.total_sessions) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
             type: 'Webinar Visited', category: 'Content', source: 'HubSpot',
             date: totals.last_touch_date || today, confidence: 'High', impact: 'High',
-            title: `${totals.contacts_found || 0} contacts · ${totals.total_sessions || 0} sessions · ${totals.total_conversion_events || 0} conversions`,
+            title: `${contactsFound} contacts · ${totals.total_sessions || totals.meaningful_activity || 0} sessions · ${totals.total_conversion_events || totals.contacts_with_demos || 0} demos`,
             description: `First touch: ${totals.first_touch_date || 'unknown'} · Last touch: ${totals.last_touch_date || 'unknown'}`,
           });
         }
-        const contacts = (d.contacts_summary || []) as { name: string; email?: string; title?: string; status?: string; conversion_count?: number }[];
+        const contacts = (d.contacts_summary || []) as { name: string; email?: string; title?: string; status?: string; conversion_count?: number; conversions?: number; visits?: number }[];
         if (contacts.length) {
-          const people: Person[] = contacts.map((c, i) => ({
-            id: genId('person'), accountId, name: c.name,
-            title: c.title || c.status || '', company: companyName,
-            department: guessDepartment(c.title || c.status || ''),
-            location: '', tenure: '', linkedin: '',
-            email: c.email,
-            source: 'hubspot' as const,
-            influence: (c.conversion_count && c.conversion_count > 5 ? 'High' : c.conversion_count && c.conversion_count > 0 ? 'Medium' : 'Low') as 'High' | 'Medium' | 'Low',
-            avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
-          }));
+          const people: Person[] = contacts.map((c, i) => {
+            const convCount = c.conversion_count ?? c.conversions ?? 0;
+            return {
+              id: genId('person'), accountId, name: c.name,
+              title: c.title || c.status || '', company: companyName,
+              department: guessDepartment(c.title || c.status || ''),
+              location: '', tenure: '', linkedin: '',
+              email: c.email,
+              source: 'hubspot' as const,
+              influence: (convCount > 5 ? 'High' : convCount > 0 || (c.visits ?? 0) > 3 ? 'Medium' : 'Low') as 'High' | 'Medium' | 'Low',
+              avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+            };
+          });
           updates.people = [...(updates.people || []), ...people];
         }
         const timeline = (d.content_timeline || []) as { date: string; person: string; event: string; source?: string }[];
@@ -578,9 +582,10 @@ export function importTorpedoJson(
         if (d.timing_quality) whyParts.push(`Timing: ${d.timing_quality}`);
         if (d.account_status) whyParts.push(d.account_status);
         if (d.situation_summary) whyParts.push(d.situation_summary);
+        if (d.situation) whyParts.push(d.situation);
         if (whyParts.length) updates.whyMatters = whyParts.join(' · ');
 
-        const angles = (d.angles || []) as { angle?: string; angle_name?: string; strength?: string; detail?: string; rationale?: string; pitch_framing?: string; hook?: string; target_contacts?: string[] }[];
+        const angles = (d.angles || []) as { angle?: string; angle_name?: string; strength?: string; detail?: string; description?: string; rationale?: string; pitch_framing?: string; hook?: string; target_contacts?: string[]; recommended_contacts?: string[] }[];
         if (angles.length) {
           updates.whyKeywords = angles.map(a => ((a.angle_name || a.angle) || '').split(' ').slice(0, 4).join(' ')).filter(Boolean);
         }
@@ -589,9 +594,9 @@ export function importTorpedoJson(
         const second = angles[1];
         updates.opportunitySummary = {
           businessTrigger: top ? (top.angle_name || top.angle || '') : (d.situation_summary || ''),
-          likelyPriorities: top ? (top.rationale || top.detail || top.hook || '') : '',
-          potentialPainPoints: second ? (second.rationale || second.detail || second.hook || '') : (d.caution || ''),
-          recommendedAngle: d.recommended_sequence || (top ? `${top.angle_name || top.angle || ''}: ${(top.hook || top.rationale || top.pitch_framing || '').slice(0, 300)}` : ''),
+          likelyPriorities: top ? (top.rationale || top.detail || top.description || top.hook || '') : '',
+          potentialPainPoints: second ? (second.rationale || second.detail || second.description || second.hook || '') : (d.caution || ''),
+          recommendedAngle: d.recommended_sequence || (top ? `${top.angle_name || top.angle || ''}: ${(top.hook || top.rationale || top.description || top.pitch_framing || '').slice(0, 300)}` : ''),
         };
         break;
       }
