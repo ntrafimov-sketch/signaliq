@@ -382,7 +382,7 @@ export function PersonDetailPage() {
             <div className="flex items-center gap-2">
               <Mail className="w-4 h-4 text-gray-500" />
               <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Outreach Sequence</h2>
-              {sequenceResult && (
+              {sequenceResult?.sequence?.length > 0 && (
                 <span className="text-xs text-gray-400">{sequenceResult.sequence.length} steps · {Math.max(...sequenceResult.sequence.map(s => s.day))} days</span>
               )}
             </div>
@@ -421,7 +421,7 @@ export function PersonDetailPage() {
             )}
             {/* Steps timeline */}
             <div className="divide-y divide-gray-100">
-              {sequenceResult.sequence.map((step: SequenceStep, i: number) => {
+              {(sequenceResult.sequence ?? []).map((step: SequenceStep, i: number) => {
                 const stepId = `step-${i}`;
                 const hasContent = step.body || step.script || step.content;
                 const isEmail = step.channel === 'email';
