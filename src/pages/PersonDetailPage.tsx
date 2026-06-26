@@ -100,6 +100,17 @@ export function PersonDetailPage() {
   };
 
   const handleGenerate = async () => {
+    setGenerateError(null);
+
+    const clayWebhook = import.meta.env.VITE_CLAY_SEQUENCE_WEBHOOK;
+    const payload = {
+      account_id: account.id,
+      person_id: person.id,
+      person,
+      account,
+      signals: account.signals,
+    };
+
     // 1. Try local bridge (python3 bridge.py running on port 7337)
     try {
       const health = await fetch('http://localhost:7337/health', { signal: AbortSignal.timeout(600) });
@@ -109,14 +120,29 @@ export function PersonDetailPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ person, account, signals: account.signals }),
         });
-        return; // Claude Desktop opened with the prompt
+        setGenerating(true); // keep spinner — result comes via WebSocket
+        return;
       }
     } catch { /* bridge not running */ }
 
-    // 2. Try direct Claude API
+    // 2. Clay webhook — same pipeline as torpedo research
+    if (clayWebhook) {
+      try {
+        const res = await fetch(clayWebhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          setGenerating(true); // keep spinner — result comes via WebSocket from /api/sequence-result
+          return;
+        }
+      } catch { /* Clay unreachable */ }
+    }
+
+    // 3. Try direct Claude API
     if (isClaudeConfigured()) {
       setGenerating(true);
-      setGenerateError(null);
       try {
         const sequence = await generateOutreachSequence(account, person, account.signals);
         setMessages(sequence);
@@ -133,7 +159,7 @@ export function PersonDetailPage() {
       return;
     }
 
-    // 3. Fallback: show prompt modal
+    // 4. Fallback: show prompt modal
     setShowPromptModal(true);
   };
 
@@ -401,7 +427,8 @@ export function PersonDetailPage() {
           {generating ? (
             <div className="px-5 py-12 text-center">
               <Loader2 className="w-8 h-8 text-indigo-400 mx-auto mb-3 animate-spin" />
-              <p className="text-slate-600 font-medium">Claude is writing your sequence...</p>
+              <p className="text-slate-600 font-medium">Generating sequence — will update automatically…</p>
+              <p className="text-slate-400 text-xs mt-1">Claude is running via Clay or bridge</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
