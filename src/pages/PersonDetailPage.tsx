@@ -83,25 +83,41 @@ export function PersonDetailPage() {
   };
 
   const handleGenerate = async () => {
-    if (!isClaudeConfigured()) {
-      setShowPromptModal(true);
+    // 1. Try local bridge (python3 bridge.py running on port 7337)
+    try {
+      const health = await fetch('http://localhost:7337/health', { signal: AbortSignal.timeout(600) });
+      if (health.ok) {
+        await fetch('http://localhost:7337/sequence', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ person, account, signals: account.signals }),
+        });
+        return; // Claude Desktop opened with the prompt
+      }
+    } catch { /* bridge not running */ }
+
+    // 2. Try direct Claude API
+    if (isClaudeConfigured()) {
+      setGenerating(true);
+      setGenerateError(null);
+      try {
+        const sequence = await generateOutreachSequence(account, person, account.signals);
+        setMessages(sequence);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updatedPeople = (account.people ?? []).map((p: any) =>
+          p.id === personId ? { ...p, sequence } : p
+        );
+        updateAccount(account.id, { people: updatedPeople });
+      } catch (e: unknown) {
+        setGenerateError(e instanceof Error ? e.message : 'Generation failed');
+      } finally {
+        setGenerating(false);
+      }
       return;
     }
-    setGenerating(true);
-    setGenerateError(null);
-    try {
-      const sequence = await generateOutreachSequence(account, person, account.signals);
-      setMessages(sequence);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const updatedPeople = (account.people ?? []).map((p: any) =>
-        p.id === personId ? { ...p, sequence } : p
-      );
-      updateAccount(account.id, { people: updatedPeople });
-    } catch (e: unknown) {
-      setGenerateError(e instanceof Error ? e.message : 'Generation failed');
-    } finally {
-      setGenerating(false);
-    }
+
+    // 3. Fallback: show prompt modal
+    setShowPromptModal(true);
   };
 
   const getPromptText = () => {
