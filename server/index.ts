@@ -89,6 +89,26 @@ app.post('/api/enrich', (req, res) => {
   res.json({ ok: true, pushed_to: clients.size });
 });
 
+// Clay webhook — receives generated outreach sequence for a person
+app.post('/api/sequence-result', (req, res) => {
+  const key = req.headers['x-api-key'] || req.query.api_key;
+  if (key !== API_KEY) {
+    res.status(401).json({ error: 'Invalid API key' });
+    return;
+  }
+
+  const { account_id, person_id, sequence } = req.body;
+  if (!account_id || !person_id || !sequence) {
+    res.status(400).json({ error: 'account_id, person_id, and sequence are required' });
+    return;
+  }
+
+  broadcast('sequence', { account_id, person_id, sequence });
+  console.log(`[server] sequence result pushed for person ${person_id} @ account ${account_id}`);
+
+  res.json({ ok: true, pushed_to: clients.size });
+});
+
 // Serve React frontend
 app.use(express.static(distDir));
 app.get('/{*path}', (_req, res) => {

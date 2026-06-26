@@ -1,11 +1,13 @@
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL || 'ws://localhost:3001';
 
 type EnrichHandler = (accountId: string, companyName: string, torpedoData: unknown[]) => void;
+type SequenceHandler = (accountId: string, personId: string, sequence: unknown[]) => void;
 type StatusHandler = (status: 'connecting' | 'connected' | 'disconnected', lastMsg?: string) => void;
 
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 const handlers = new Set<EnrichHandler>();
+const sequenceHandlers = new Set<SequenceHandler>();
 const statusHandlers = new Set<StatusHandler>();
 
 function notifyStatus(status: 'connecting' | 'connected' | 'disconnected', lastMsg?: string) {
@@ -32,6 +34,10 @@ function connect() {
         for (const h of handlers) {
           h(data.account_id, data.company_name, data.data);
         }
+      } else if (name === 'sequence') {
+        for (const h of sequenceHandlers) {
+          h(data.account_id, data.person_id, data.sequence);
+        }
       }
     } catch (e) {
       console.error('[WS] parse error', e);
@@ -46,10 +52,16 @@ function connect() {
   socket.onclose = () => {
     socket = null;
     notifyStatus('disconnected');
-    if (handlers.size > 0) {
+    if (handlers.size > 0 || sequenceHandlers.size > 0) {
       reconnectTimer = setTimeout(connect, 3000);
     }
   };
+}
+
+export function subscribeSequenceResult(onSequence: SequenceHandler) {
+  sequenceHandlers.add(onSequence);
+  connect();
+  return () => { sequenceHandlers.delete(onSequence); };
 }
 
 export function connectWebhookListener(onEnrich: EnrichHandler) {

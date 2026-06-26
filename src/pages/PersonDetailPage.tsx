@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ExternalLink, Copy, Send, RefreshCw, Mail,
@@ -11,6 +11,7 @@ import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { generateOutreachSequence, buildSequencePrompt, isClaudeConfigured } from '../services/claude';
+import { subscribeSequenceResult } from '../services/webhookListener';
 import type { OutreachMessage, CareerEntry } from '../types';
 
 type TabType = 'All' | 'Email' | 'LinkedIn';
@@ -59,6 +60,22 @@ export function PersonDetailPage() {
 
   const storedSequence: OutreachMessage[] = person?.sequence ?? [];
   const [messages, setMessages] = useState<OutreachMessage[]>(storedSequence);
+
+  // Listen for sequence results pushed via Clay → Railway webhook → WebSocket
+  useEffect(() => {
+    if (!id || !personId) return;
+    return subscribeSequenceResult((accountId, pId, sequence) => {
+      if (accountId !== id || pId !== personId) return;
+      const msgs = (sequence as OutreachMessage[]).map((m, i) => ({ ...m, id: m.id || `ws-${Date.now()}-${i}` }));
+      setMessages(msgs);
+      setGenerating(false);
+      updateAccount(id, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        people: (account as any).people.map((p: any) => p.id === personId ? { ...p, sequence: msgs } : p),
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, personId]);
 
   if (!account || !person) {
     return (
