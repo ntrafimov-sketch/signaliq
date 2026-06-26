@@ -103,25 +103,24 @@ app.post('/api/sequence-result', (req, res) => {
   }
 
   const { account_id, person_id } = req.body;
-  let { sequence } = req.body;
+  let { result } = req.body;
 
-  if (!account_id || !person_id || !sequence) {
-    res.status(400).json({ error: 'account_id, person_id, and sequence are required' });
+  if (!account_id || !person_id || !result) {
+    res.status(400).json({ error: 'account_id, person_id, and result are required' });
     return;
   }
 
-  // Clay may send sequence as a JSON string — parse it
-  if (typeof sequence === 'string') {
+  // Clay may send result as a JSON string — parse it
+  if (typeof result === 'string') {
     try {
-      const match = sequence.match(/\[[\s\S]*\]/);
-      sequence = JSON.parse(match ? match[0] : sequence);
+      result = JSON.parse(result);
     } catch {
-      res.status(400).json({ error: 'sequence must be a valid JSON array' });
+      res.status(400).json({ error: 'result must be valid JSON' });
       return;
     }
   }
 
-  broadcast('sequence', { account_id, person_id, sequence });
+  broadcast('sequence', { account_id, person_id, result });
   console.log(`[server] sequence result pushed for person ${person_id} @ account ${account_id}`);
 
   res.json({ ok: true, pushed_to: clients.size });

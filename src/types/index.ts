@@ -120,6 +120,8 @@ export interface Person {
   careerTrack?: CareerEntry[];
   recentPosts?: Array<{ date: string; platform: string; content: string; url?: string }>;
   whatToPitch?: { likelyPriorities?: string; recommendedAngle?: string; painPoints?: string };
+  sequence?: OutreachMessage[];
+  sequenceResult?: SequenceResult;
 }
 
 export interface AdChannelRow {
@@ -155,6 +157,47 @@ export interface OutreachMessage {
   subject?: string;
   body: string;
   basedOn: string[];
+}
+
+export interface SequenceStep {
+  day: number;
+  channel: 'email' | 'linkedin';
+  touch_type: string;
+  block?: string;
+  email_number?: number;
+  dm_number?: number;
+  subject?: string;
+  body?: string;
+  script?: string;
+  content?: string | null;
+}
+
+export interface SequenceResult {
+  prospect: {
+    name: string;
+    title: string;
+    company: string;
+    persona?: string;
+    previous_company?: string;
+    months_in_role?: number;
+    location?: string;
+    language?: string;
+  };
+  signals_used?: Record<string, unknown>;
+  calculations?: {
+    monthly_revenue?: number;
+    monthly_downloads?: number;
+    revenue_trend?: string;
+    email_capture_estimate?: number;
+    recoverable_annual_mail?: number;
+    recoverable_monthly_mail?: number;
+    monthly_refunds?: number;
+    recoverable_annual_refund?: number;
+    recoverable_monthly_refund?: number;
+  };
+  blocks?: Record<string, unknown>;
+  sequence: SequenceStep[];
+  amplemarket_url?: string;
 }
 
 export interface DepartmentIntelligence {

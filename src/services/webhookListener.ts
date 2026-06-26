@@ -1,7 +1,7 @@
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL || 'ws://localhost:3001';
 
 type EnrichHandler = (accountId: string, companyName: string, torpedoData: unknown[]) => void;
-type SequenceHandler = (accountId: string, personId: string, sequence: unknown[]) => void;
+type SequenceHandler = (accountId: string, personId: string, result: unknown) => void;
 type StatusHandler = (status: 'connecting' | 'connected' | 'disconnected', lastMsg?: string) => void;
 
 let socket: WebSocket | null = null;
@@ -36,7 +36,7 @@ function connect() {
         }
       } else if (name === 'sequence') {
         for (const h of sequenceHandlers) {
-          h(data.account_id, data.person_id, data.sequence);
+          h(data.account_id, data.person_id, data.result);
         }
       }
     } catch (e) {

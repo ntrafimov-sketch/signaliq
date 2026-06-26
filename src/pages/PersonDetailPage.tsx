@@ -12,9 +12,8 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { buildSequencePrompt } from '../services/claude';
 import { subscribeSequenceResult } from '../services/webhookListener';
-import type { OutreachMessage, CareerEntry } from '../types';
+import type { CareerEntry, SequenceResult, SequenceStep } from '../types';
 
-type TabType = 'All' | 'Email' | 'LinkedIn';
 
 function CompanyLogo({ company }: { company: string }) {
   const [stage, setStage] = useState(0);
@@ -51,27 +50,25 @@ export function PersonDetailPage() {
   const account = accounts.find(a => a.id === id);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const person = (account as any)?.people?.find((p: any) => p.id === personId);
-  const [activeTab, setActiveTab] = useState<TabType>('All');
   const [copied, setCopied] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
 
-  const storedSequence: OutreachMessage[] = person?.sequence ?? [];
-  const [messages, setMessages] = useState<OutreachMessage[]>(storedSequence);
+  const [sequenceResult, setSequenceResult] = useState<SequenceResult | null>(person?.sequenceResult ?? null);
 
   // Listen for sequence results pushed via Clay → Railway webhook → WebSocket
   useEffect(() => {
     if (!id || !personId) return;
-    return subscribeSequenceResult((accountId, pId, sequence) => {
+    return subscribeSequenceResult((accountId, pId, result) => {
       if (accountId !== id || pId !== personId) return;
-      const msgs = (sequence as OutreachMessage[]).map((m, i) => ({ ...m, id: m.id || `ws-${Date.now()}-${i}` }));
-      setMessages(msgs);
+      const sr = result as SequenceResult;
+      setSequenceResult(sr);
       setGenerating(false);
       updateAccount(id, {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        people: (account as any).people.map((p: any) => p.id === personId ? { ...p, sequence: msgs } : p),
+        people: (account as any).people.map((p: any) => p.id === personId ? { ...p, sequenceResult: sr } : p),
       });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,12 +83,6 @@ export function PersonDetailPage() {
     );
   }
 
-  const filteredMessages = messages.filter(m => {
-    if (activeTab === 'All') return true;
-    if (activeTab === 'Email') return m.type === 'Email';
-    if (activeTab === 'LinkedIn') return m.type === 'LinkedIn' || m.type === 'Follow-up';
-    return true;
-  });
 
   const handleCopy = (msgId: string, text: string) => {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -223,7 +214,7 @@ export function PersonDetailPage() {
           </div>
           {/* Actions */}
           <div className="flex gap-2 flex-shrink-0">
-            {messages.length > 0 && (
+            {sequenceResult && (
               <Button variant="secondary" size="sm" onClick={handleGenerate} disabled={generating}>
                 <RefreshCw className={cn('w-3.5 h-3.5', generating && 'animate-spin')} />
                 Regenerate
@@ -231,12 +222,12 @@ export function PersonDetailPage() {
             )}
             <Button
               variant="primary" size="sm"
-              onClick={messages.length > 0 ? () => window.open('https://app.amplemarket.com/sequences', '_blank') : handleGenerate}
+              onClick={sequenceResult ? () => window.open('https://app.amplemarket.com/sequences', '_blank') : handleGenerate}
               disabled={generating}
             >
               {generating ? (
                 <><Loader2 className="w-3.5 h-3.5 animate-spin" />Generating...</>
-              ) : messages.length > 0 ? (
+              ) : sequenceResult ? (
                 <><Send className="w-3.5 h-3.5" />Send sequence</>
               ) : (
                 <><Sparkles className="w-3.5 h-3.5" />Generate Sequence</>
@@ -309,8 +300,8 @@ export function PersonDetailPage() {
             </div>
           )}
 
-          {/* Generate sequence CTA if no messages */}
-          {messages.length === 0 && !generating && isClaudeConfigured() && (
+          {/* Generate sequence CTA if no sequence yet */}
+          {!sequenceResult && !generating && (
             <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
               <button onClick={handleGenerate}
                 className="w-full flex items-center justify-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800">
@@ -385,77 +376,107 @@ export function PersonDetailPage() {
       </Card>
 
       {/* Outreach sequence */}
-      {(messages.length > 0 || generating) && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-gray-500" />
-                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Outreach Sequence</h2>
-              </div>
-              <div className="flex border border-gray-200 rounded-lg overflow-hidden">
-                {(['All', 'Email', 'LinkedIn'] as TabType[]).map(tab => (
-                  <button key={tab} onClick={() => setActiveTab(tab)}
-                    className={cn('px-3 py-1.5 text-sm font-medium transition-colors',
-                      activeTab === tab ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50')}>
-                    {tab}
-                  </button>
-                ))}
-              </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-gray-500" />
+              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Outreach Sequence</h2>
+              {sequenceResult && (
+                <span className="text-xs text-gray-400">{sequenceResult.sequence.length} steps · {Math.max(...sequenceResult.sequence.map(s => s.day))} days</span>
+              )}
             </div>
-          </CardHeader>
+            {sequenceResult?.amplemarket_url && (
+              <a href={sequenceResult.amplemarket_url} target="_blank" rel="noopener noreferrer">
+                <Button variant="primary" size="sm"><Send className="w-3.5 h-3.5" />Add to Amplemarket</Button>
+              </a>
+            )}
+          </div>
+        </CardHeader>
 
-          {generating ? (
-            <div className="px-5 py-12 text-center">
-              <Loader2 className="w-8 h-8 text-indigo-400 mx-auto mb-3 animate-spin" />
-              <p className="text-slate-600 font-medium">Generating sequence — will update automatically…</p>
-              <p className="text-slate-400 text-xs mt-1">Claude is running via Clay or bridge</p>
-            </div>
-          ) : (
+        {generating ? (
+          <div className="px-5 py-12 text-center">
+            <Loader2 className="w-8 h-8 text-indigo-400 mx-auto mb-3 animate-spin" />
+            <p className="text-slate-600 font-medium">Generating sequence — will update automatically…</p>
+            <p className="text-slate-400 text-xs mt-1">Running via Clay</p>
+          </div>
+        ) : sequenceResult ? (
+          <div>
+            {/* Calculations summary */}
+            {sequenceResult.calculations && (
+              <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex flex-wrap gap-4 text-xs text-gray-500">
+                {sequenceResult.calculations.monthly_revenue && (
+                  <span>Revenue <span className="font-semibold text-gray-700">${(sequenceResult.calculations.monthly_revenue / 1000).toFixed(0)}K/mo</span></span>
+                )}
+                {sequenceResult.calculations.monthly_downloads && (
+                  <span>Downloads <span className="font-semibold text-gray-700">{(sequenceResult.calculations.monthly_downloads / 1000).toFixed(0)}K/mo</span></span>
+                )}
+                {sequenceResult.calculations.recoverable_annual_mail && (
+                  <span>Mail recovery <span className="font-semibold text-green-600">${(sequenceResult.calculations.recoverable_annual_mail / 1000).toFixed(0)}K/yr</span></span>
+                )}
+                {sequenceResult.calculations.recoverable_annual_refund && (
+                  <span>Refund recovery <span className="font-semibold text-green-600">${(sequenceResult.calculations.recoverable_annual_refund / 1000).toFixed(0)}K/yr</span></span>
+                )}
+              </div>
+            )}
+            {/* Steps timeline */}
             <div className="divide-y divide-gray-100">
-              {filteredMessages.map(msg => (
-                <div key={msg.id} className="px-5 py-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-gray-500 uppercase bg-gray-100 px-2 py-0.5 rounded">{msg.type}</span>
-                      <span className="text-xs text-gray-400 italic">{msg.style}</span>
+              {sequenceResult.sequence.map((step: SequenceStep, i: number) => {
+                const stepId = `step-${i}`;
+                const hasContent = step.body || step.script || step.content;
+                const isEmail = step.channel === 'email';
+                const channelColor = isEmail ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-violet-50 text-violet-600 border-violet-100';
+                const touchLabel = step.touch_type.replace(/_/g, ' ');
+                return (
+                  <div key={i} className="px-5 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-bold text-gray-400 w-8 shrink-0">D{step.day}</span>
+                        <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full border shrink-0', channelColor)}>
+                          {isEmail ? '✉' : 'in'} {touchLabel}
+                          {step.email_number ? ` #${step.email_number}` : ''}
+                          {step.dm_number ? ` #${step.dm_number}` : ''}
+                        </span>
+                        {step.subject && (
+                          <span className="text-xs text-gray-500 truncate">"{step.subject}"</span>
+                        )}
+                      </div>
+                      {hasContent && (
+                        <Button variant="ghost" size="sm" className="shrink-0"
+                          onClick={() => handleCopy(stepId, step.body || step.script || step.content || '')}>
+                          <Copy className="w-3.5 h-3.5" />
+                          {copied === stepId ? 'Copied!' : 'Copy'}
+                        </Button>
+                      )}
                     </div>
-                    <Button variant="ghost" size="sm"
-                      onClick={() => handleCopy(msg.id, (msg.subject ? `Subject: ${msg.subject}\n\n` : '') + msg.body)}>
-                      <Copy className="w-3.5 h-3.5" />
-                      {copied === msg.id ? 'Copied!' : 'Copy'}
-                    </Button>
+                    {(step.body || step.script) && (
+                      <pre className="mt-2 text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed pl-10">
+                        {step.body || step.script}
+                      </pre>
+                    )}
+                    {step.content && (
+                      <p className="mt-2 text-sm text-gray-600 italic pl-10">{step.content}</p>
+                    )}
                   </div>
-                  {msg.subject && (
-                    <p className="text-xs text-gray-400 mb-1">Subject: <span className="text-gray-700 font-medium">{msg.subject}</span></p>
-                  )}
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">{msg.body}</pre>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          )}
-        </Card>
-      )}
-
-      {/* Empty sequence state */}
-      {messages.length === 0 && !generating && (
-        <Card>
+          </div>
+        ) : (
           <CardContent>
             <div className="py-10 text-center">
               <Sparkles className="w-10 h-10 text-indigo-300 mx-auto mb-3" />
               <p className="text-slate-600 font-medium mb-1">No outreach sequence yet</p>
               <p className="text-sm text-slate-400 mb-4">
-                {isClaudeConfigured()
-                  ? `Generate a personalized sequence for ${person.name} based on ${account.signals.length} signals`
-                  : `Build a personalized sequence for ${person.name} — copy prompt to Claude.ai or send via email`}
+                Generate a personalized sequence for {person.name} based on {account.signals.length} signals
               </p>
               <Button variant="primary" size="sm" onClick={handleGenerate}>
                 <Sparkles className="w-3.5 h-3.5" />Generate Sequence
               </Button>
             </div>
           </CardContent>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* Prompt export modal */}
       {showPromptModal && (
