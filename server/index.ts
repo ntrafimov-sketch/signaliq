@@ -13,6 +13,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = join(__dirname, '../dist');
 
 const API_KEY = process.env.WEBHOOK_API_KEY || 'signaliq-dev-key';
+const API_KEY_CLAY = process.env.WEBHOOK_API_KEY_CLAY || 'signaliq-clay-key';
+
+function isValidKey(key: unknown): boolean {
+  return key === API_KEY || key === API_KEY_CLAY;
+}
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
@@ -42,7 +47,7 @@ app.get('/health', (_req, res) => {
 // Clay webhook — receives torpedo JSON for an account
 app.post('/api/enrich', (req, res) => {
   const key = req.headers['x-api-key'] || req.query.api_key;
-  if (key !== API_KEY) {
+  if (!isValidKey(key)) {
     res.status(401).json({ error: 'Invalid API key' });
     return;
   }
@@ -92,7 +97,7 @@ app.post('/api/enrich', (req, res) => {
 // Clay webhook — receives generated outreach sequence for a person
 app.post('/api/sequence-result', (req, res) => {
   const key = req.headers['x-api-key'] || req.query.api_key;
-  if (key !== API_KEY) {
+  if (!isValidKey(key)) {
     res.status(401).json({ error: 'Invalid API key' });
     return;
   }
