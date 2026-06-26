@@ -10,7 +10,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { generateOutreachSequence, generateSequenceFromTorpedo, buildSequencePrompt, isClaudeConfigured } from '../services/claude';
+import { buildSequencePrompt } from '../services/claude';
 import { subscribeSequenceResult } from '../services/webhookListener';
 import type { OutreachMessage, CareerEntry } from '../types';
 
@@ -140,28 +140,7 @@ export function PersonDetailPage() {
       } catch { /* Clay unreachable */ }
     }
 
-    // 3. Direct Claude API — torpedo JSON is primary, fallback to parsed account
-    if (isClaudeConfigured()) {
-      setGenerating(true);
-      try {
-        const sequence = account.torpedoData?.length
-          ? await generateSequenceFromTorpedo(account.torpedoData, person.name)
-          : await generateOutreachSequence(account, person, account.signals);
-        setMessages(sequence);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const updatedPeople = (account.people ?? []).map((p: any) =>
-          p.id === personId ? { ...p, sequence } : p
-        );
-        updateAccount(account.id, { people: updatedPeople });
-      } catch (e: unknown) {
-        setGenerateError(e instanceof Error ? e.message : 'Generation failed');
-      } finally {
-        setGenerating(false);
-      }
-      return;
-    }
-
-    // 4. Fallback: show prompt modal
+    // 3. Fallback: show prompt modal
     setShowPromptModal(true);
   };
 
