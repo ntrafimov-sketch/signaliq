@@ -62,19 +62,15 @@ OUTPUT FORMAT: Return ONLY valid JSON array, no markdown, no explanation:
 ]`;
 
 // ---------------------------------------------------------------------------
-// Generate outreach sequence for a specific person
+// Build the prompt (reusable for both direct API call and email export)
 // ---------------------------------------------------------------------------
 
-export async function generateOutreachSequence(
-  account: Account,
-  person: Person,
-  signals: Signal[]
-): Promise<OutreachMessage[]> {
-  if (!API_KEY) throw new Error('VITE_ANTHROPIC_API_KEY not set');
-
+export function buildSequencePrompt(account: Account, person: Person, signals: Signal[]): { system: string; user: string } {
   const topSignals = signals.slice(0, 8).map(s => `- [${s.category}] ${s.title}: ${s.description}`).join('\n');
 
-  const userMessage = `Generate a 4-message outreach sequence for this prospect.
+  const wtp = person.whatToPitch;
+
+  const user = `Generate a 4-message outreach sequence for this prospect.
 
 CONTACT:
 - Name: ${person.name}
@@ -84,6 +80,10 @@ CONTACT:
 - Industry: ${account.industry}
 - Employees: ${account.employees?.toLocaleString()}
 - Influence: ${person.influence}
+${person.bio ? `- Bio: ${person.bio}` : ''}
+${wtp?.recommendedAngle ? `- Recommended angle: ${wtp.recommendedAngle}` : ''}
+${wtp?.likelyPriorities ? `- Likely priorities: ${wtp.likelyPriorities}` : ''}
+${wtp?.painPoints ? `- Pain points: ${wtp.painPoints}` : ''}
 
 ACCOUNT SIGNALS (use these to personalize):
 ${topSignals}
@@ -98,6 +98,22 @@ Write 4 messages: cold email, follow-up 1, LinkedIn connection request, breakup 
 Reference ${person.name}'s specific role and the signals above.
 Sign as [Your name] from Adapty.`;
 
+  return { system: ADAPTY_SYSTEM_PROMPT, user };
+}
+
+// ---------------------------------------------------------------------------
+// Generate outreach sequence for a specific person
+// ---------------------------------------------------------------------------
+
+export async function generateOutreachSequence(
+  account: Account,
+  person: Person,
+  signals: Signal[]
+): Promise<OutreachMessage[]> {
+  if (!API_KEY) throw new Error('VITE_ANTHROPIC_API_KEY not set');
+
+  const { system, user: userMessage } = buildSequencePrompt(account, person, signals);
+
   const response = await fetch(API_URL, {
     method: 'POST',
     headers: {
@@ -110,7 +126,7 @@ Sign as [Your name] from Adapty.`;
       model: 'claude-opus-4-8',
       max_tokens: 2000,
       thinking: { type: 'adaptive' },
-      system: ADAPTY_SYSTEM_PROMPT,
+      system,
       messages: [{ role: 'user', content: userMessage }],
     }),
   });
@@ -130,3 +146,4 @@ Sign as [Your name] from Adapty.`;
   const messages: OutreachMessage[] = JSON.parse(match[0]);
   return messages.map((m, i) => ({ ...m, id: `gen-${Date.now()}-${i}` }));
 }
+
