@@ -91,6 +91,7 @@ export interface Account {
     manager_ic?: Array<{ name: string; title: string; reports_to?: string | null }>;
     unknown?: Array<{ name: string; title: string; reports_to?: string | null }>;
   };
+  torpedoData?: unknown[];
 }
 
 export interface CareerEntry {

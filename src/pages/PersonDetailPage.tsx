@@ -103,12 +103,12 @@ export function PersonDetailPage() {
     setGenerateError(null);
 
     const clayWebhook = import.meta.env.VITE_CLAY_SEQUENCE_WEBHOOK;
+    // Torpedo JSON has all company/person data — skill in Clay handles the rest
     const payload = {
       account_id: account.id,
       person_id: person.id,
-      person,
-      account,
-      signals: account.signals,
+      person_name: person.name,
+      torpedo_json: account.torpedoData ?? [],
     };
 
     // 1. Try local bridge (python3 bridge.py running on port 7337)

@@ -646,6 +646,7 @@ export function importTorpedoJson(
     scoreLabel: scoreLabel as Account['scoreLabel'],
     enrichmentStatus: 'done',
     lastUpdated: today,
+    torpedoData: entries,
   };
 }
 
