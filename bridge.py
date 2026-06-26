@@ -64,8 +64,8 @@ end try
 
 CLAY_SEQUENCE_WEBHOOK = "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-5b3b2188-ad8b-4392-829d-5248bff64596"
 
-def _run_sequence_in_background(data: dict) -> None:
-    """Call Claude API directly, then POST result to Clay webhook."""
+def trigger_sequence(data: dict) -> None:
+    """Paste /cold-email-master prompt into Claude Desktop via AppleScript."""
     person = data.get("person", {})
     account = data.get("account", {})
     name = person.get("name", "").strip()
@@ -73,83 +73,17 @@ def _run_sequence_in_background(data: dict) -> None:
     person_id = person.get("id", data.get("person_id", ""))
     torpedo_json = json.dumps(account.get("torpedoData") or data.get("torpedo_json") or [], ensure_ascii=False)
 
-    # Read skill file
-    skill_content = ""
-    if os.path.exists(SKILL_PATH):
-        with open(SKILL_PATH, "r") as f:
-            skill_content = f.read()
-    else:
-        print(f"  ⚠ Skill file not found at {SKILL_PATH}")
-
-    user_message = f"""Generate sequence for {name}.
+    prompt = f"""/cold-email-master {name}
 
 <torpedo_json>
 {torpedo_json}
 </torpedo_json>
 
-Return ONLY valid JSON object, no markdown:
-{{
-  "prospect": {{"name": "...", "title": "...", "company": "..."}},
-  "calculations": {{"monthly_revenue": 0, "monthly_downloads": 0, "recoverable_annual_mail": 0, "recoverable_annual_refund": 0, "monthly_refunds": 0}},
-  "sequence": [
-    {{"day": 1, "channel": "linkedin", "touch_type": "profile_visit_and_like"}},
-    {{"day": 2, "channel": "email", "touch_type": "email", "email_number": 1, "subject": "...", "body": "..."}}
-  ]
-}}"""
+After generating the sequence JSON, send it to SignalIQ by running this curl command (replace SEQUENCE_JSON_HERE with the full JSON object, no quotes around it):
 
-    payload = json.dumps({
-        "model": "claude-opus-4-8",
-        "max_tokens": 8000,
-        "system": skill_content,
-        "messages": [{"role": "user", "content": user_message}]
-    }).encode()
+curl -s -X POST "{CLAY_SEQUENCE_WEBHOOK}" -H "Content-Type: application/json" -d '{{"account_id":"{account_id}","person_id":"{person_id}","result":SEQUENCE_JSON_HERE}}'"""
 
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=payload,
-        headers={
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        method="POST"
-    )
-
-    with urllib.request.urlopen(req) as resp:
-        result = json.loads(resp.read())
-
-    text = next((b["text"] for b in result.get("content", []) if b.get("type") == "text"), "")
-
-    # Extract JSON from response
-    import re
-    match = re.search(r'\{[\s\S]*\}', text)
-    if not match:
-        raise ValueError(f"No JSON found in Claude response: {text[:200]}")
-    sequence_obj = json.loads(match.group(0))
-
-    # POST to Clay webhook
-    clay_payload = json.dumps({
-        "account_id": account_id,
-        "person_id": person_id,
-        "result": sequence_obj
-    }).encode()
-
-    clay_req = urllib.request.Request(
-        CLAY_SEQUENCE_WEBHOOK,
-        data=clay_payload,
-        headers={"content-type": "application/json"},
-        method="POST"
-    )
-    with urllib.request.urlopen(clay_req) as r:
-        print(f"  ✓ Sequence sent to Clay for {name} ({r.status})")
-
-
-def trigger_sequence(data: dict) -> None:
-    """Start sequence generation in background thread — no Claude Desktop."""
-    if not ANTHROPIC_API_KEY:
-        raise ValueError("ANTHROPIC_API_KEY not set in environment")
-    thread = threading.Thread(target=_run_sequence_in_background, args=(data,), daemon=True)
-    thread.start()
+    paste_prompt_to_claude(prompt)
 
 
 def trigger_claude(data: dict) -> None:
