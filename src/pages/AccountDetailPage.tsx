@@ -270,6 +270,7 @@ export function AccountDetailPage() {
                   const parsed = JSON.parse(raw);
                   const arr = Array.isArray(parsed) ? parsed : Object.values(parsed as Record<string, unknown>);
                   const updates = importTorpedoJson(arr as Parameters<typeof importTorpedoJson>[0], account.id, account.company_name);
+                  console.log('[import] torpedoData length:', (updates as any).torpedoData?.length);
                   updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
                   setShowJsonPaste(false);
                   setJsonPasteError('');
