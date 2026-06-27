@@ -47,8 +47,8 @@ delay 0.6
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Switch to Chat tab via keyboard shortcut
-        keystroke "1" using command down
+        -- Switch to Chat tab via keyboard shortcut (Cmd+1)
+        keystroke "1" using {command down, shift down}
         delay 0.6
         keystroke "n" using command down
         delay 1.2
