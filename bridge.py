@@ -47,13 +47,8 @@ delay 0.6
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Switch to Chat tab (try multiple selectors)
-        try
-            click button "Chat" of window 1
-        end try
-        try
-            click button 1 of window 1
-        end try
+        -- Switch to Chat tab (button 1 = Chat, button 3 = Code)
+        click button 1 of window 1
         delay 0.5
         keystroke "n" using command down
         delay 0.8
