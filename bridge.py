@@ -47,11 +47,14 @@ delay 0.6
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Look for a window that has a text field (chat input), not a terminal
+        -- Switch to Chat tab (try multiple selectors)
         try
             click button "Chat" of window 1
-            delay 0.3
         end try
+        try
+            click button 1 of window 1
+        end try
+        delay 0.5
         keystroke "n" using command down
         delay 0.8
         set the clipboard to "{prompt_escaped}"
