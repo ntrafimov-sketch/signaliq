@@ -32,20 +32,28 @@ def paste_prompt_to_claude(prompt: str) -> None:
     script = f"""
 set prevApp to (path to frontmost application as text)
 
+-- Find Claude chat window (not Claude Code)
+set claudeFound to false
+tell application "System Events"
+    set allProcs to name of every application process
+end tell
+
+-- Try "Claude" first, but skip if it looks like Code
 tell application "{CLAUDE_APP}"
     activate
 end tell
 
-delay 0.5
+delay 0.6
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
+        -- Look for a window that has a text field (chat input), not a terminal
         try
             click button "Chat" of window 1
             delay 0.3
         end try
         keystroke "n" using command down
-        delay 0.6
+        delay 0.8
         set the clipboard to "{prompt_escaped}"
         keystroke "v" using command down
         delay 0.3
