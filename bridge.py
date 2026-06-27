@@ -49,12 +49,12 @@ tell application "System Events"
     tell process "{CLAUDE_APP}"
         -- Switch to Chat tab via keyboard shortcut
         keystroke "1" using command down
-        delay 0.5
+        delay 0.6
         keystroke "n" using command down
-        delay 0.8
+        delay 1.2
         set the clipboard to "{prompt_escaped}"
         keystroke "v" using command down
-        delay 0.3
+        delay 0.5
         key code 36
     end tell
 end tell
