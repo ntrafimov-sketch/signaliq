@@ -352,6 +352,7 @@ export function AccountsPage() {
             paywallAnalysis: updates.paywallAnalysis,
             paywallScreenshot: updates.paywallScreenshot,
             departmentIntel: updates.departmentIntel,
+            torpedoData: updates.torpedoData,
           };
           console.log('[webhook] creating new account', newAccount.company_name, newAccount.id);
           addAccounts([newAccount]);
