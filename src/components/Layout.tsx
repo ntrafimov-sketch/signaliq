@@ -22,7 +22,8 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.currentUser);
   const logout = useAuthStore((s) => s.logout);
-  const { profile, setProfile } = useStore((s) => ({ profile: s.profile, setProfile: s.setProfile }));
+  const profile = useStore((s) => s.profile);
+  const setProfile = useStore((s) => s.setProfile);
 
   // Keep profile in sync with logged-in user
   useEffect(() => {
