@@ -296,7 +296,7 @@ export function AccountsPage() {
   const [webhookError, setWebhookError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = subscribeWsStatus((status, msg) => {
+    const unsub = subscribeWsStatus((status) => {
       setWsStatus(status);
     });
     return () => unsub();
