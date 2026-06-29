@@ -43,10 +43,13 @@ type SortDir = 'asc' | 'desc';
 function parseEmployeeCount(raw: unknown): number {
   if (raw == null || raw === '') return 0;
   const s = String(raw).trim();
-  // LinkedIn-style range "51-200" or "1,001-5,000" → take upper bound
+  // Prefer explicit estimate: "est. ~318", "~318", "≈318", "approx 318"
+  const est = s.match(/(?:est\.?|approx\.?|~|≈)\s*(\d[\d,]*)/i);
+  if (est) return parseInt(est[1].replace(/,/g, ''), 10) || 0;
+  // LinkedIn-style range "51-200" or "201-500" → upper bound
   const range = s.match(/(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)/);
   if (range) return parseInt(range[2].replace(/,/g, ''), 10) || 0;
-  // Strip everything non-digit: "~423 (Amplemarket est.)" → 423
+  // Plain number with noise: "423 employees" → 423
   return parseInt(s.replace(/[^\d]/g, ''), 10) || 0;
 }
 
