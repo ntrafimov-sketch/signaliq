@@ -64,6 +64,8 @@ export function PersonDetailPage() {
     return subscribeSequenceResult((accountId, pId, result) => {
       if (accountId !== id || pId !== personId) return;
       const sr = result as SequenceResult;
+      console.log('[sequence] received result keys:', Object.keys(result || {}));
+      console.log('[sequence] sequence length:', sr?.sequence?.length, 'first step:', JSON.stringify(sr?.sequence?.[0]));
       setSequenceResult(sr);
       setGenerating(false);
       updateAccount(id, {

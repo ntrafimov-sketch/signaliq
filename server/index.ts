@@ -122,6 +122,9 @@ app.post('/api/sequence-result', (req, res) => {
 
   broadcast('sequence', { account_id, person_id, result });
   console.log(`[server] sequence result pushed for person ${person_id} @ account ${account_id}`);
+  console.log(`[server] result keys: ${Object.keys(result || {}).join(', ')}`);
+  console.log(`[server] sequence length: ${(result as any)?.sequence?.length ?? 'NO sequence field'}`);
+  console.log(`[server] result sample: ${JSON.stringify(result).slice(0, 500)}`);
 
   res.json({ ok: true, pushed_to: clients.size });
 });
