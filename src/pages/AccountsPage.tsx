@@ -39,6 +39,22 @@ import { cn } from '../lib/utils';
 type SortField = 'company_name' | 'score' | 'employees' | 'signals' | 'lastUpdated';
 type SortDir = 'asc' | 'desc';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getHeadcount(account: Account): number {
+  if (account.employees > 0) return account.employees;
+  if ((account.people?.length ?? 0) > 0) return account.people!.length;
+  // Scan torpedoData for any headcount-like field
+  for (const entry of (account.torpedoData ?? []) as any[]) {
+    if (entry?.type === 'company_intel') {
+      const d = entry.data || {};
+      const raw = d.employees ?? d.headcount ?? d.employee_count ?? d.team_size ?? d.staff_count ?? d.number_of_employees ?? '';
+      const n = typeof raw === 'number' ? raw : parseInt(String(raw).replace(/[^\d]/g, '')) || 0;
+      if (n > 0) return n;
+    }
+  }
+  return 0;
+}
+
 function ScoreRing({ score, tier }: { score: number; tier: string }) {
   const r = 18, circ = 2 * Math.PI * r;
   const color = tier === 'Hot' ? '#ef4444' : tier === 'Warm' ? '#f59e0b' : '#6366f1';
@@ -606,7 +622,7 @@ export function AccountsPage() {
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="flex items-center gap-1.5 text-sm text-gray-600">
                       <Users className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{account.employees > 0 ? account.employees.toLocaleString() : (account.people?.length ?? 0) > 0 ? account.people!.length : '—'}</span>
+                      {(() => { const h = getHeadcount(account); return <span>{h > 0 ? h.toLocaleString() : '—'}</span>; })()}
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
