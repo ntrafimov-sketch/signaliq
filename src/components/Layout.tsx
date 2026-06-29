@@ -22,7 +22,15 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.currentUser);
   const logout = useAuthStore((s) => s.logout);
-  const profile = useStore((s) => s.profile);
+  const { profile, setProfile } = useStore((s) => ({ profile: s.profile, setProfile: s.setProfile }));
+
+  // Keep profile in sync with logged-in user
+  useEffect(() => {
+    if (currentUser && (profile.email !== currentUser.email || profile.name !== currentUser.name)) {
+      setProfile({ name: currentUser.name, email: currentUser.email });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   const [collapsed, setCollapsed] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
