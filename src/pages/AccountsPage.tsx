@@ -261,7 +261,7 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
 }
 
 export function AccountsPage() {
-  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount } = useStore();
+  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount, profile } = useStore();
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [sortField, setSortField] = useState<SortField>('score');
@@ -330,7 +330,9 @@ export function AccountsPage() {
             scoreLabel: updates.scoreLabel || 'Cold',
             signals: updates.signals || [],
             enrichmentStatus: 'done',
-            lastUpdated: 'Just now',
+            lastUpdated: new Date().toISOString(),
+            addedAt: new Date().toISOString(),
+            addedBy: useStore.getState().profile.name,
             description: updates.description || '',
             founded: updates.founded || '',
             hq: updates.hq || '',
@@ -360,7 +362,7 @@ export function AccountsPage() {
           console.log('[webhook] updating existing account', account.company_name,
             'orgChart:', !!updates.orgChart, 'news:', updates.news?.length,
             'people:', updates.people?.length, 'signals:', updates.signals?.length);
-          updateAccount(account.id, { ...updates, lastUpdated: 'Just now' });
+          updateAccount(account.id, { ...updates, lastUpdated: new Date().toISOString() });
         }
       } catch (err) {
         console.error('[webhook] handler error', err);
@@ -569,7 +571,16 @@ export function AccountsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
-                    <span className="text-sm text-gray-500">{account.lastUpdated}</span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm text-gray-500">
+                        {account.addedAt
+                          ? new Date(account.addedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : account.lastUpdated}
+                      </span>
+                      {account.addedBy && (
+                        <span className="text-xs text-gray-400">by {account.addedBy.split(' ')[0]}</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -603,7 +614,9 @@ export function AccountsPage() {
               score: 0,
               scoreLabel: 'Cold',
               signals: [],
-              lastUpdated: 'Just now',
+              lastUpdated: new Date().toISOString(),
+              addedAt: new Date().toISOString(),
+              addedBy: useStore.getState().profile.name,
               description: '',
               founded: '',
               hq: '',

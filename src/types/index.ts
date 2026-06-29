@@ -57,6 +57,8 @@ export interface Account {
   scoreLabel: ScoreLabel;
   signals: Signal[];
   lastUpdated: string;
+  addedAt?: string;
+  addedBy?: string;
   description: string;
   founded: string;
   hq: string;
