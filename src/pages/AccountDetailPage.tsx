@@ -174,9 +174,12 @@ export function AccountDetailPage() {
     .sort(byDate);
   const hubspotEngagement = account.signals
     .filter((s: Signal) => s.source === 'HubSpot' && s.type === 'Webinar Visited');
-  // Show contacts from research (amplemarket) — if none, show all people
-  const researchPeople = (account.people ?? []).filter(p => p.source === 'amplemarket');
-  const amplemarketPeople = researchPeople.length > 0 ? researchPeople : (account.people ?? []).filter(p => p.source !== 'hubspot');
+  // Show all people from JSON (amplemarket first, then hubspot)
+  const amplemarketPeople = [...(account.people ?? [])].sort((a, b) => {
+    if (a.source === 'amplemarket' && b.source !== 'amplemarket') return -1;
+    if (a.source !== 'amplemarket' && b.source === 'amplemarket') return 1;
+    return 0;
+  });
 
   return (
     <div className="space-y-5">
@@ -793,7 +796,7 @@ export function AccountDetailPage() {
           {/* Contacts view */}
           {peopleView === 'contacts' && (amplemarketPeople.length === 0 ? (
             <Card>
-              <div className="px-5 py-10 text-center text-sm text-gray-400">No Amplemarket contacts found</div>
+              <div className="px-5 py-10 text-center text-sm text-gray-400">No contacts found</div>
             </Card>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
