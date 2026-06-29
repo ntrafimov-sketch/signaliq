@@ -73,6 +73,20 @@ function normalizeSequenceResult(raw: any): SequenceResult | null {
   const stepsRaw: any[] = raw.sequence || raw.stages || raw.touches || [];
   if (stepsRaw.length === 0) return raw as SequenceResult;
 
+  // Resolve {{ email_N_body | newline_to_br }} template variables from emails{}
+  const emailsLookup: Record<string, string> = raw.emails || raw.lead_data || {};
+  const hasTemplateVars = stepsRaw.some((s: any) =>
+    (s.body && /\{\{\s*\w+/.test(s.body)) || (s.subject && /\{\{\s*\w+/.test(s.subject))
+  );
+  if (hasTemplateVars && Object.keys(emailsLookup).length > 0) {
+    const resolved = stepsRaw.map((s: any) => ({
+      ...s,
+      body: s.body ? s.body.replace(/\{\{\s*([\w_]+)(?:\s*\|[^}]*)?\}\}/g, (_: string, key: string) => emailsLookup[key] ?? s.body) : s.body,
+      subject: s.subject ? s.subject.replace(/\{\{\s*([\w_]+)(?:\s*\|[^}]*)?\}\}/g, (_: string, key: string) => emailsLookup[key] ?? s.subject) : s.subject,
+    }));
+    return { ...raw, sequence: resolved } as SequenceResult;
+  }
+
   // Already fully normalized?
   if (raw.sequence && !raw.stages && !raw.touches && !raw.sequence_structure) return raw as SequenceResult;
 
