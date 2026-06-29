@@ -65,29 +65,34 @@ export function PersonDetailPage() {
       if (accountId !== id || pId !== personId) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = result as any;
-      // cold-email-master outputs stages[] + lead_data{} — normalize to SequenceResult
-      if (!raw.sequence && raw.stages) {
+      // Normalize various cold-email-master output formats → SequenceResult
+      // Supported: stages[]+lead_data{}, touches[], sequence[] (already correct)
+      const stepsRaw: any[] = raw.sequence || raw.stages || raw.touches || [];
+      if (!raw.sequence || raw.stages || raw.touches) {
         const leadData: Record<string, string> = raw.lead_data || {};
         let emailNum = 0;
         let dmNum = 0;
-        raw.sequence = raw.stages.map((stage: any) => {
+        raw.sequence = stepsRaw.map((s: any) => {
+          const ch = (s.channel || '').toLowerCase() as 'email' | 'linkedin';
           const step: SequenceStep = {
-            day: stage.day,
-            channel: stage.channel,
-            touch_type: stage.type || (stage.channel === 'email' ? 'email' : 'linkedin_message'),
+            day: s.day,
+            channel: ch,
+            touch_type: s.type || s.touch_type || (ch === 'email' ? 'email' : 'linkedin_message'),
           };
-          if (stage.channel === 'email') {
+          if (ch === 'email') {
             emailNum++;
             step.email_number = emailNum;
-            step.subject = stage.subject_key ? leadData[stage.subject_key] : leadData[`email_${emailNum}_subject`];
-            step.body = stage.body_key ? leadData[stage.body_key] : leadData[`email_${emailNum}_body`];
+            // body may be inline or referenced via body_key into lead_data
+            step.body = s.body || (s.body_key ? leadData[s.body_key] : leadData[`email_${emailNum}_body`]);
+            step.subject = s.subject || (s.subject_key ? leadData[s.subject_key] : leadData[`email_${emailNum}_subject`]);
           } else {
-            if (stage.notes) {
+            const noteText = s.notes || s.note || s.script || null;
+            if (noteText) {
               dmNum++;
               step.dm_number = dmNum;
-              step.script = stage.notes;
+              step.script = noteText;
             }
-            step.content = stage.notes || null;
+            step.content = noteText;
           }
           return step;
         });
