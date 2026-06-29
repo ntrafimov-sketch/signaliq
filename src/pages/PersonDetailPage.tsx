@@ -46,14 +46,41 @@ function CompanyLogo({ company }: { company: string }) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeSequenceResult(raw: any): SequenceResult | null {
   if (!raw) return null;
+
+  // Format 3: sequence_structure[] + emails{} + linkedin_touches{}
+  if (!raw.sequence && raw.sequence_structure) {
+    const emails: Record<string, string> = raw.emails || {};
+    const liTouches: Record<string, string> = raw.linkedin_touches || {};
+    let emailNum = 0; let dmNum = 0;
+    raw.sequence = raw.sequence_structure.map((s: any) => {
+      const isEmail = s.type === 'email';
+      const ch: 'email' | 'linkedin' = isEmail ? 'email' : 'linkedin';
+      const step: SequenceStep = { day: s.day, channel: ch, touch_type: s.type };
+      if (isEmail && s.ref) {
+        emailNum++;
+        step.email_number = emailNum;
+        step.body = emails[`${s.ref}_body`];
+        step.subject = emails[`${s.ref}_subject`];
+      } else if (s.ref) {
+        const noteText = liTouches[s.ref] || null;
+        if (noteText) { dmNum++; step.dm_number = dmNum; step.script = noteText; }
+        step.content = noteText;
+      }
+      return step;
+    });
+  }
+
   const stepsRaw: any[] = raw.sequence || raw.stages || raw.touches || [];
   if (stepsRaw.length === 0) return raw as SequenceResult;
+
+  // Already fully normalized?
+  if (raw.sequence && !raw.stages && !raw.touches && !raw.sequence_structure) return raw as SequenceResult;
+
   const leadData: Record<string, string> = raw.lead_data || {};
   let emailNum = 0;
   let dmNum = 0;
   const sequence: SequenceStep[] = stepsRaw.map((s: any) => {
     const ch = (s.channel || '').toLowerCase() as 'email' | 'linkedin';
-    // Already normalized step
     if (s.touch_type && (s.body || s.script || s.content !== undefined)) return s as SequenceStep;
     const step: SequenceStep = {
       day: s.day,
