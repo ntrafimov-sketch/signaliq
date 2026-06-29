@@ -41,17 +41,16 @@ type SortDir = 'asc' | 'desc';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getHeadcount(account: Account): number {
-  if (account.employees > 0) return account.employees;
-  if ((account.people?.length ?? 0) > 0) return account.people!.length;
-  // Scan torpedoData for any headcount-like field
+  // First try torpedoData — most accurate source
   for (const entry of (account.torpedoData ?? []) as any[]) {
     if (entry?.type === 'company_intel') {
       const d = entry.data || {};
-      const raw = d.employees ?? d.headcount ?? d.employee_count ?? d.team_size ?? d.staff_count ?? d.number_of_employees ?? '';
+      const raw = d.headcount ?? d.employees ?? d.employee_count ?? d.team_size ?? d.staff_count ?? d.number_of_employees ?? '';
       const n = typeof raw === 'number' ? raw : parseInt(String(raw).replace(/[^\d]/g, '')) || 0;
       if (n > 0) return n;
     }
   }
+  if (account.employees > 0) return account.employees;
   return 0;
 }
 
