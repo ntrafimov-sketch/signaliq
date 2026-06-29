@@ -8,7 +8,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
 import { importTorpedoJson } from '../services/importTorpedo';
-import { connectWebhookListener, subscribeWsStatus, subscribeInit, getWsUrl } from '../services/webhookListener';
+import { connectWebhookListener, subscribeWsStatus, subscribeInit } from '../services/webhookListener';
 import { useAuthStore } from '../store/useAuthStore';
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL || '';
@@ -293,13 +293,11 @@ export function AccountsPage() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
-  const [wsLastMsg, setWsLastMsg] = useState<string | null>(null);
   const [webhookError, setWebhookError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = subscribeWsStatus((status, msg) => {
       setWsStatus(status);
-      if (msg) setWsLastMsg(msg);
     });
     return () => unsub();
   }, []);
