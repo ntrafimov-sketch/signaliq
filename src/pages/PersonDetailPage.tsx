@@ -63,9 +63,14 @@ export function PersonDetailPage() {
     if (!id || !personId) return;
     return subscribeSequenceResult((accountId, pId, result) => {
       if (accountId !== id || pId !== personId) return;
-      const sr = result as SequenceResult;
-      console.log('[sequence] received result keys:', Object.keys(result || {}));
-      console.log('[sequence] sequence length:', sr?.sequence?.length, 'first step:', JSON.stringify(sr?.sequence?.[0]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw = result as any;
+      // cold-email-master outputs 'stages' — normalize to 'sequence'
+      if (!raw.sequence && raw.stages) {
+        raw.sequence = raw.stages;
+      }
+      console.log('[sequence] first stage:', JSON.stringify(raw?.sequence?.[0]));
+      const sr = raw as SequenceResult;
       setSequenceResult(sr);
       setGenerating(false);
       updateAccount(id, {
