@@ -28,8 +28,14 @@ CLAUDE_APP = "Claude"
 
 def paste_prompt_to_claude(prompt: str) -> None:
     """Low-level: paste a prompt string into a new Claude Desktop chat."""
-    # Step 1: open Claude and create new chat
-    script_open = f"""
+    # Write prompt to temp file to avoid AppleScript escaping issues
+    tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
+    tmp.write(prompt)
+    tmp.close()
+    tmp_path = tmp.name
+
+    safe_tmp = tmp_path.replace("\\", "\\\\").replace('"', '\\"')
+    script = f"""
 set prevApp to (path to frontmost application as text)
 tell application "{CLAUDE_APP}"
     activate
@@ -41,26 +47,20 @@ tell application "System Events"
         delay 0.5
         keystroke "n" using command down
         delay 1.0
-    end tell
-end tell
-"""
-    subprocess.run(["osascript", "-e", script_open], check=True)
-
-    # Step 2: write prompt to clipboard
-    subprocess.run(["pbcopy"], input=prompt.encode("utf-8"), check=True)
-
-    # Step 3: paste and send
-    script_paste = f"""
-tell application "System Events"
-    tell process "{CLAUDE_APP}"
+        do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
+        delay 0.3
         keystroke "v" using command down
         delay 0.3
         key code 36
     end tell
 end tell
-tell application (path to frontmost application as text) to activate
+do shell script "rm -f " & quoted form of "{safe_tmp}"
 """
-    subprocess.run(["osascript", "-e", script_paste], check=True)
+    try:
+        subprocess.run(["osascript", "-e", script], check=True)
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 
 CLAY_SEQUENCE_WEBHOOK = "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-5b3b2188-ad8b-4392-829d-5248bff64596"
