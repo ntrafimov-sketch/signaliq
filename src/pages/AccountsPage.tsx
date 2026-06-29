@@ -469,7 +469,13 @@ export function AccountsPage() {
     <div className="space-y-5">
       {/* Header row */}
       <div className="flex items-center gap-4">
-        <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Companies</h1>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <h1 className="text-xl font-bold text-gray-900">Companies</h1>
+          <span className={cn('w-2 h-2 rounded-full',
+            wsStatus === 'connected' ? 'bg-green-500' :
+            wsStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+          )} title={wsStatus === 'connected' ? 'Live' : wsStatus === 'connecting' ? 'Connecting…' : 'Disconnected'} />
+        </div>
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -489,20 +495,9 @@ export function AccountsPage() {
         </button>
       </div>
 
-      {/* WebSocket status */}
-      <div className="flex items-center gap-2 text-xs text-gray-400">
-        <span className={cn('w-2 h-2 rounded-full flex-shrink-0',
-          wsStatus === 'connected' ? 'bg-green-500' :
-          wsStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
-        )} />
-        <span>
-          {wsStatus === 'connected' ? `Live · ${getWsUrl()}` :
-           wsStatus === 'connecting' ? `Connecting to ${getWsUrl()}…` :
-           `Disconnected · ${getWsUrl()}`}
-        </span>
-        {wsLastMsg && <span className="text-green-600 font-medium">· {wsLastMsg}</span>}
-        {webhookError && <span className="text-red-500 font-medium">· ⚠ {webhookError}</span>}
-      </div>
+      {webhookError && (
+        <div className="text-xs text-red-500">⚠ {webhookError}</div>
+      )}
 
       {/* Upload success banner */}
       {uploadSuccess && (
