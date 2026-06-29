@@ -51,11 +51,7 @@ tell application "System Events"
     end tell
 end tell
 
-delay 0.3
-
-try
-    tell application (prevApp) to activate
-end try
+tell application (prevApp) to activate
 """
     subprocess.run(["osascript", "-e", script], check=True)
 
@@ -140,11 +136,7 @@ tell application "System Events"
     end tell
 end tell
 
-delay 0.3
-
-try
-    tell application (prevApp) to activate
-end try
+tell application (prevApp) to activate
 """
     try:
         subprocess.run(["osascript", "-e", script], check=True)
