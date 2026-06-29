@@ -40,18 +40,43 @@ type SortField = 'company_name' | 'score' | 'employees' | 'signals' | 'lastUpdat
 type SortDir = 'asc' | 'desc';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseEmployeeCount(raw: unknown): number {
+  if (raw == null) return 0;
+  const s = String(raw).trim();
+  // LinkedIn-style ranges: "51-200", "201-500", "1001-5000" → take upper bound
+  const range = s.match(/^(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)$/);
+  if (range) return parseInt(range[2].replace(/,/g, ''), 10) || 0;
+  // Strip non-numeric prefix/suffix: "~423 (est.)", "≈1,200 employees"
+  const digits = s.replace(/[^\d]/g, '');
+  return parseInt(digits, 10) || 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getHeadcount(account: Account): number {
   for (const entry of (account.torpedoData ?? []) as any[]) {
     if (entry?.type === 'company_intel') {
       const d = entry.data || {};
-      // Only use fields that are clearly employee headcount, not user/subscriber counts
-      const raw = d.headcount ?? d.employee_count ?? d.team_size ?? d.staff_count ?? d.number_of_employees ?? '';
-      const n = typeof raw === 'number' ? raw : parseInt(String(raw).replace(/[^\d]/g, '')) || 0;
-      // Sanity cap: real employee headcount is < 200k for app companies
-      if (n > 0 && n < 200_000) return n;
+      // Priority order: explicit headcount fields first, ambiguous last
+      // Skip 'employees' — often stores user/subscriber counts in torpedo JSON
+      const candidates = [
+        d.headcount,
+        d.employee_count,
+        d.number_of_employees,
+        d.team_size,
+        d.staff_count,
+        d.size,           // LinkedIn-style "51-200"
+        d.company_size,
+        // 'employees' last and only if looks like headcount (< 50k)
+        d.employees,
+      ];
+      for (const raw of candidates) {
+        if (raw == null) continue;
+        const n = parseEmployeeCount(raw);
+        if (n > 0 && n <= 50_000) return n;
+      }
     }
   }
-  if (account.employees > 0 && account.employees < 200_000) return account.employees;
+  if (account.employees > 0 && account.employees <= 50_000) return account.employees;
   return 0;
 }
 
