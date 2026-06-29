@@ -606,7 +606,7 @@ export function AccountsPage() {
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="flex items-center gap-1.5 text-sm text-gray-600">
                       <Users className="w-3.5 h-3.5 text-gray-400" />
-                      <span>{account.employees > 0 ? account.employees.toLocaleString() : '—'}</span>
+                      <span>{account.employees > 0 ? account.employees.toLocaleString() : (account.people?.length ?? 0) > 0 ? account.people!.length : '—'}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
