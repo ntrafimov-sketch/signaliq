@@ -261,7 +261,7 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
 }
 
 export function AccountsPage() {
-  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount } = useStore();
+  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount, profile } = useStore();
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [sortField, setSortField] = useState<SortField>('score');
@@ -519,7 +519,7 @@ export function AccountsPage() {
                 </th>
                 <th className="px-4 py-3 text-left hidden sm:table-cell">
                   <button onClick={() => handleSort('lastUpdated')} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700">
-                    Last Updated <SortIcon field="lastUpdated" />
+                    Added <SortIcon field="lastUpdated" />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-right">
@@ -577,9 +577,9 @@ export function AccountsPage() {
                           ? new Date(account.addedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                           : account.lastUpdated}
                       </span>
-                      {account.addedBy && (
-                        <span className="text-xs text-gray-400">by {account.addedBy.split(' ')[0]}</span>
-                      )}
+                      <span className="text-xs text-gray-400">
+                        by {(account.addedBy || profile.name).split(' ')[0]}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
