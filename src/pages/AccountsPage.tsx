@@ -57,24 +57,31 @@ const EMPLOYEE_KEY = /headcount|employ|staff|workforce|personnel|team.?size|comp
 const USER_KEY = /\buser|subscriber|customer|download|install|dau|mau|active|register|member|player|listener/i;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function searchObjectForHeadcount(d: Record<string, unknown>): number {
+  for (const [key, val] of Object.entries(d)) {
+    if (!EMPLOYEE_KEY.test(key) || USER_KEY.test(key)) continue;
+    const n = parseEmployeeCount(val);
+    if (n >= 1 && n <= 50_000) return n;
+  }
+  if (d.employees != null) {
+    const n = parseEmployeeCount(d.employees);
+    if (n >= 1 && n <= 50_000) return n;
+  }
+  return 0;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getHeadcount(account: Account): number {
   for (const entry of (account.torpedoData ?? []) as any[]) {
-    if (entry?.type === 'company_intel') {
-      const d = entry.data || {};
-      console.log(`[headcount] ${account.company_name} keys:`, Object.keys(d));
-      // Pass 1: strong employee-named fields (headcount, staff, size, etc.)
-      for (const [key, val] of Object.entries(d)) {
-        if (!EMPLOYEE_KEY.test(key)) continue;
-        if (USER_KEY.test(key)) continue;
-        const n = parseEmployeeCount(val);
-        if (n >= 1 && n <= 50_000) return n;
-      }
-      // Pass 2: 'employees' field — use only if value looks like headcount (< 50k)
-      if (d.employees != null) {
-        const n = parseEmployeeCount(d.employees);
-        if (n >= 1 && n <= 50_000) return n;
-      }
+    if (!entry || typeof entry !== 'object') continue;
+    // Check entry.data (normal case)
+    if (entry.data && typeof entry.data === 'object' && !Array.isArray(entry.data)) {
+      const n = searchObjectForHeadcount(entry.data);
+      if (n) return n;
     }
+    // Check top-level entry fields (some torpedo formats skip the data wrapper)
+    const n = searchObjectForHeadcount(entry);
+    if (n) return n;
   }
   if (account.employees > 0 && account.employees <= 50_000) return account.employees;
   return 0;
