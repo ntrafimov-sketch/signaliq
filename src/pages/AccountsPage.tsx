@@ -41,16 +41,17 @@ type SortDir = 'asc' | 'desc';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getHeadcount(account: Account): number {
-  // First try torpedoData — most accurate source
   for (const entry of (account.torpedoData ?? []) as any[]) {
     if (entry?.type === 'company_intel') {
       const d = entry.data || {};
-      const raw = d.headcount ?? d.employees ?? d.employee_count ?? d.team_size ?? d.staff_count ?? d.number_of_employees ?? '';
+      // Only use fields that are clearly employee headcount, not user/subscriber counts
+      const raw = d.headcount ?? d.employee_count ?? d.team_size ?? d.staff_count ?? d.number_of_employees ?? '';
       const n = typeof raw === 'number' ? raw : parseInt(String(raw).replace(/[^\d]/g, '')) || 0;
-      if (n > 0) return n;
+      // Sanity cap: real employee headcount is < 200k for app companies
+      if (n > 0 && n < 200_000) return n;
     }
   }
-  if (account.employees > 0) return account.employees;
+  if (account.employees > 0 && account.employees < 200_000) return account.employees;
   return 0;
 }
 
