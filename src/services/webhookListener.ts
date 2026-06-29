@@ -3,12 +3,14 @@ const WS_URL = import.meta.env.VITE_BACKEND_WS_URL || 'ws://localhost:3001';
 type EnrichHandler = (accountId: string, companyName: string, torpedoData: unknown[]) => void;
 type SequenceHandler = (accountId: string, personId: string, result: unknown) => void;
 type StatusHandler = (status: 'connecting' | 'connected' | 'disconnected', lastMsg?: string) => void;
+type InitHandler = (accounts: unknown[]) => void;
 
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 const handlers = new Set<EnrichHandler>();
 const sequenceHandlers = new Set<SequenceHandler>();
 const statusHandlers = new Set<StatusHandler>();
+const initHandlers = new Set<InitHandler>();
 
 function notifyStatus(status: 'connecting' | 'connected' | 'disconnected', lastMsg?: string) {
   for (const h of statusHandlers) h(status, lastMsg);
@@ -29,7 +31,11 @@ function connect() {
     try {
       const { event: name, data } = JSON.parse(event.data);
       console.log('[WS] message:', name, data);
-      if (name === 'enrich') {
+      if (name === 'init') {
+        for (const h of initHandlers) h(data.accounts || []);
+      } else if (name === 'accounts_updated') {
+        for (const h of initHandlers) h(data.accounts || []);
+      } else if (name === 'enrich') {
         notifyStatus('connected', `Got: ${data.company_name} @ ${new Date().toLocaleTimeString()}`);
         for (const h of handlers) {
           h(data.account_id, data.company_name, data.data);
@@ -62,6 +68,12 @@ export function subscribeSequenceResult(onSequence: SequenceHandler) {
   sequenceHandlers.add(onSequence);
   connect();
   return () => { sequenceHandlers.delete(onSequence); };
+}
+
+export function subscribeInit(onInit: InitHandler) {
+  initHandlers.add(onInit);
+  connect();
+  return () => { initHandlers.delete(onInit); };
 }
 
 export function connectWebhookListener(onEnrich: EnrichHandler) {

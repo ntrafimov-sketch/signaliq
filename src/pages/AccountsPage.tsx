@@ -8,7 +8,31 @@ import { Avatar } from '../components/ui/Avatar';
 import { CsvUpload } from '../components/CsvUpload';
 import { useStore } from '../store/useStore';
 import { importTorpedoJson } from '../services/importTorpedo';
-import { connectWebhookListener, subscribeWsStatus, getWsUrl } from '../services/webhookListener';
+import { connectWebhookListener, subscribeWsStatus, subscribeInit, getWsUrl } from '../services/webhookListener';
+import { useAuthStore } from '../store/useAuthStore';
+
+const BACKEND = import.meta.env.VITE_BACKEND_URL || '';
+
+async function syncAccount(account: Account, token: string | null) {
+  if (!token) return;
+  try {
+    await fetch(`${BACKEND}/api/accounts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(account),
+    });
+  } catch { /* non-critical */ }
+}
+
+async function deleteAccountOnServer(id: string, token: string | null) {
+  if (!token) return;
+  try {
+    await fetch(`${BACKEND}/api/accounts/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch { /* non-critical */ }
+}
 import type { Account } from '../types';
 import { cn } from '../lib/utils';
 
@@ -261,7 +285,8 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
 }
 
 export function AccountsPage() {
-  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount, profile } = useStore();
+  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount, setAccounts, profile } = useStore();
+  const token = useAuthStore((s) => s.token);
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [sortField, setSortField] = useState<SortField>('score');
@@ -278,6 +303,16 @@ export function AccountsPage() {
     });
     return () => unsub();
   }, []);
+
+  // Load shared accounts from server on connect
+  useEffect(() => {
+    const unsub = subscribeInit((serverAccounts) => {
+      if (serverAccounts.length > 0) {
+        setAccounts(serverAccounts as Account[]);
+      }
+    });
+    return () => unsub();
+  }, [setAccounts]);
 
   // Keep a ref to latest accounts so the webhook handler never captures stale closure
   const accountsRef = useRef(accounts);
@@ -358,11 +393,14 @@ export function AccountsPage() {
           };
           console.log('[webhook] creating new account', newAccount.company_name, newAccount.id);
           addAccounts([newAccount]);
+          syncAccount(newAccount, useAuthStore.getState().token);
         } else {
           console.log('[webhook] updating existing account', account.company_name,
             'orgChart:', !!updates.orgChart, 'news:', updates.news?.length,
             'people:', updates.people?.length, 'signals:', updates.signals?.length);
+          const updated = { ...account, ...updates, lastUpdated: new Date().toISOString() };
           updateAccount(account.id, { ...updates, lastUpdated: new Date().toISOString() });
+          syncAccount(updated as Account, useAuthStore.getState().token);
         }
       } catch (err) {
         console.error('[webhook] handler error', err);
@@ -584,7 +622,7 @@ export function AccountsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={(e) => { e.preventDefault(); removeAccount(account.id); }}
+                      onClick={(e) => { e.preventDefault(); removeAccount(account.id); deleteAccountOnServer(account.id, token); }}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                       title="Delete company"
                     >

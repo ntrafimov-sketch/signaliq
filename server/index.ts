@@ -4,6 +4,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 const app = express();
 const server = createServer(app);
@@ -11,6 +14,8 @@ const wss = new WebSocketServer({ server });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = join(__dirname, '../dist');
+const DATA_FILE = join(__dirname, 'data.json');
+const JWT_SECRET = process.env.JWT_SECRET || 'signaliq-jwt-secret-2024';
 
 const API_KEY = process.env.WEBHOOK_API_KEY || 'signaliq-dev-key';
 const API_KEY_CLAY = process.env.WEBHOOK_API_KEY_CLAY || 'signaliq-clay-key';
@@ -20,15 +25,67 @@ function isValidKey(key: unknown): boolean {
 }
 const PORT = process.env.PORT || 3001;
 
+// ── Persistent storage ──────────────────────────────────────────────────────
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  createdAt: string;
+}
+
+interface ServerData {
+  users: User[];
+  accounts: unknown[];
+}
+
+function loadData(): ServerData {
+  try {
+    if (existsSync(DATA_FILE)) {
+      return JSON.parse(readFileSync(DATA_FILE, 'utf-8'));
+    }
+  } catch { /* ignore */ }
+  return { users: [], accounts: [] };
+}
+
+function saveData() {
+  try {
+    writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[server] failed to save data:', e);
+  }
+}
+
+const db: ServerData = loadData();
+console.log(`[server] loaded ${db.users.length} users, ${db.accounts.length} accounts from disk`);
+
+// ── Middleware ───────────────────────────────────────────────────────────────
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.text({ type: 'text/plain', limit: '10mb' }));
 
-// Connected browser clients
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  try {
+    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { userId: string };
+    (req as any).userId = payload.userId;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+// ── WebSocket ────────────────────────────────────────────────────────────────
+
 const clients = new Set<WebSocket>();
 
 wss.on('connection', (ws) => {
   clients.add(ws);
+  // Send current accounts to new client
+  ws.send(JSON.stringify({ event: 'init', data: { accounts: db.accounts } }));
   ws.on('close', () => clients.delete(ws));
 });
 
@@ -39,34 +96,94 @@ function broadcast(event: string, data: unknown) {
   }
 }
 
-// Health check
+// ── Auth endpoints ───────────────────────────────────────────────────────────
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true, clients: clients.size });
 });
 
-// Clay webhook — receives torpedo JSON for an account
-app.post('/api/enrich', (req, res) => {
-  const key = req.headers['x-api-key'] || req.query.api_key;
-  if (!isValidKey(key)) {
-    res.status(401).json({ error: 'Invalid API key' });
+app.post('/api/auth/register', async (req, res) => {
+  const { email, name, password } = req.body;
+  if (!email || !name || !password) {
+    res.status(400).json({ error: 'email, name, and password are required' });
     return;
   }
+  if (db.users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+    res.status(409).json({ error: 'Email already registered' });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user: User = {
+    id: `user-${Date.now()}`,
+    email: email.toLowerCase(),
+    name,
+    passwordHash,
+    createdAt: new Date().toISOString(),
+  };
+  db.users.push(user);
+  saveData();
+  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  const user = db.users.find(u => u.email.toLowerCase() === email?.toLowerCase());
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    res.status(401).json({ error: 'Invalid email or password' });
+    return;
+  }
+  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+});
+
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  const user = db.users.find(u => u.id === (req as any).userId);
+  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+  res.json({ id: user.id, email: user.email, name: user.name });
+});
+
+// ── Accounts endpoints ───────────────────────────────────────────────────────
+
+app.get('/api/accounts', requireAuth, (_req, res) => {
+  res.json(db.accounts);
+});
+
+app.post('/api/accounts', requireAuth, (req, res) => {
+  const account = req.body;
+  const existing = (db.accounts as any[]).findIndex((a: any) => a.id === account.id);
+  if (existing >= 0) {
+    (db.accounts as any[])[existing] = account;
+  } else {
+    db.accounts.push(account);
+  }
+  saveData();
+  broadcast('accounts_updated', { accounts: db.accounts });
+  res.json({ ok: true });
+});
+
+app.delete('/api/accounts/:id', requireAuth, (req, res) => {
+  db.accounts = (db.accounts as any[]).filter((a: any) => a.id !== req.params.id);
+  saveData();
+  broadcast('accounts_updated', { accounts: db.accounts });
+  res.json({ ok: true });
+});
+
+// ── Clay webhooks ────────────────────────────────────────────────────────────
+
+app.post('/api/enrich', (req, res) => {
+  const key = req.headers['x-api-key'] || req.query.api_key;
+  if (!isValidKey(key)) { res.status(401).json({ error: 'Invalid API key' }); return; }
 
   const body = req.body;
-
-  // Accept either {account_id, company_name, data} or raw array from Clay
-  let account_id: string;
-  let company_name: string;
-  let data: unknown[];
+  let account_id: string, company_name: string, data: unknown[];
 
   if (Array.isArray(body)) {
-    // Clay sends raw array — extract company info from company_intel entry
     data = body;
     const intel = body.find((e: { type?: string }) => e.type === 'company_intel') as { data?: { domain?: string; name?: string } } | undefined;
     account_id = intel?.data?.domain || `account-${Date.now()}`;
     company_name = intel?.data?.name || 'Unknown';
   } else {
-    // data field may be a stringified JSON array — parse it
     const rawData = body.data;
     if (typeof rawData === 'string') {
       try { data = JSON.parse(rawData); } catch { data = []; }
@@ -77,30 +194,15 @@ app.post('/api/enrich', (req, res) => {
     company_name = body.company_name || body.name || 'Unknown';
   }
 
-  console.log('[server] received body keys:', Object.keys(body));
-  console.log('[server] data type:', typeof data, 'isArray:', Array.isArray(data), 'length:', Array.isArray(data) ? data.length : 'n/a');
-  if (Array.isArray(data)) {
-    console.log('[server] entry types:', data.map((e: unknown) => (e as { type?: string })?.type));
-  }
+  if (!data) { res.status(400).json({ error: 'data is required' }); return; }
 
-  if (!data) {
-    res.status(400).json({ error: 'data is required' });
-    return;
-  }
-
-  // Push to all connected browsers
   broadcast('enrich', { account_id, company_name, data });
-
   res.json({ ok: true, pushed_to: clients.size });
 });
 
-// Clay webhook — receives generated outreach sequence for a person
 app.post('/api/sequence-result', (req, res) => {
   const key = req.headers['x-api-key'] || req.query.api_key;
-  if (!isValidKey(key)) {
-    res.status(401).json({ error: 'Invalid API key' });
-    return;
-  }
+  if (!isValidKey(key)) { res.status(401).json({ error: 'Invalid API key' }); return; }
 
   const { account_id, person_id } = req.body;
   let { result } = req.body;
@@ -109,27 +211,20 @@ app.post('/api/sequence-result', (req, res) => {
     res.status(400).json({ error: 'account_id, person_id, and result are required' });
     return;
   }
-
-  // Clay may send result as a JSON string — parse it
   if (typeof result === 'string') {
-    try {
-      result = JSON.parse(result);
-    } catch {
-      res.status(400).json({ error: 'result must be valid JSON' });
-      return;
+    try { result = JSON.parse(result); } catch {
+      res.status(400).json({ error: 'result must be valid JSON' }); return;
     }
   }
 
   broadcast('sequence', { account_id, person_id, result });
   console.log(`[server] sequence result pushed for person ${person_id} @ account ${account_id}`);
-  console.log(`[server] result keys: ${Object.keys(result || {}).join(', ')}`);
-  console.log(`[server] sequence length: ${(result as any)?.sequence?.length ?? 'NO sequence field'}`);
-  console.log(`[server] result sample: ${JSON.stringify(result).slice(0, 500)}`);
 
   res.json({ ok: true, pushed_to: clients.size });
 });
 
-// Serve React frontend
+// ── Frontend ─────────────────────────────────────────────────────────────────
+
 app.use(express.static(distDir));
 app.get('/{*path}', (_req, res) => {
   res.sendFile(join(distDir, 'index.html'));
@@ -137,6 +232,5 @@ app.get('/{*path}', (_req, res) => {
 
 server.listen(PORT, () => {
   console.log(`SignalIQ backend running on port ${PORT}`);
-  console.log(`Webhook URL: POST /api/enrich`);
   console.log(`API key: ${API_KEY}`);
 });

@@ -5,65 +5,59 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  passwordHash: string;
-  createdAt: string;
 }
+
+const API = import.meta.env.VITE_BACKEND_URL || '';
 
 interface AuthState {
-  users: User[];
   currentUser: User | null;
+  token: string | null;
   isAuthenticated: boolean;
-  register: (name: string, email: string, password: string) => void;
-  login: (email: string, password: string) => void;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-}
-
-const SALT = 'signaliq_salt_2024';
-
-function hashPassword(password: string): string {
-  return btoa(password + SALT);
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
-      users: [],
+    (set) => ({
       currentUser: null,
+      token: null,
       isAuthenticated: false,
 
-      register: (name: string, email: string, password: string) => {
-        const { users } = get();
-        if (users.find((u) => u.email.toLowerCase() === email.toLowerCase())) {
-          throw new Error('An account with this email already exists.');
-        }
-        const newUser: User = {
-          id: `u-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name,
-          email,
-          passwordHash: hashPassword(password),
-          createdAt: new Date().toISOString(),
-        };
-        set({ users: [...users, newUser], currentUser: newUser, isAuthenticated: true });
+      register: async (name, email, password) => {
+        const res = await fetch(`${API}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Registration failed');
+        set({ currentUser: data.user, token: data.token, isAuthenticated: true });
       },
 
-      login: (email: string, password: string) => {
-        const { users } = get();
-        const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (!user) {
-          throw new Error('No account found with this email.');
-        }
-        if (user.passwordHash !== hashPassword(password)) {
-          throw new Error('Incorrect password.');
-        }
-        set({ currentUser: user, isAuthenticated: true });
+      login: async (email, password) => {
+        const res = await fetch(`${API}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Login failed');
+        set({ currentUser: data.user, token: data.token, isAuthenticated: true });
       },
 
       logout: () => {
-        set({ currentUser: null, isAuthenticated: false });
+        set({ currentUser: null, token: null, isAuthenticated: false });
       },
     }),
     {
       name: 'signaliq-auth',
+      partialize: (state) => ({
+        currentUser: state.currentUser,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
   )
 );

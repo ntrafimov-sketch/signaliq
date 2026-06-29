@@ -19,7 +19,7 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      login(email, password);
+      await login(email, password);
       navigate('/accounts', { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed.');
