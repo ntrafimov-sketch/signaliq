@@ -65,11 +65,33 @@ export function PersonDetailPage() {
       if (accountId !== id || pId !== personId) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = result as any;
-      // cold-email-master outputs 'stages' — normalize to 'sequence'
+      // cold-email-master outputs stages[] + lead_data{} — normalize to SequenceResult
       if (!raw.sequence && raw.stages) {
-        raw.sequence = raw.stages;
+        const leadData: Record<string, string> = raw.lead_data || {};
+        let emailNum = 0;
+        let dmNum = 0;
+        raw.sequence = raw.stages.map((stage: any) => {
+          const step: SequenceStep = {
+            day: stage.day,
+            channel: stage.channel,
+            touch_type: stage.type || (stage.channel === 'email' ? 'email' : 'linkedin_message'),
+          };
+          if (stage.channel === 'email') {
+            emailNum++;
+            step.email_number = emailNum;
+            step.subject = stage.subject_key ? leadData[stage.subject_key] : leadData[`email_${emailNum}_subject`];
+            step.body = stage.body_key ? leadData[stage.body_key] : leadData[`email_${emailNum}_body`];
+          } else {
+            if (stage.notes) {
+              dmNum++;
+              step.dm_number = dmNum;
+              step.script = stage.notes;
+            }
+            step.content = stage.notes || null;
+          }
+          return step;
+        });
       }
-      console.log('[sequence] first stage:', JSON.stringify(raw?.sequence?.[0]));
       const sr = raw as SequenceResult;
       setSequenceResult(sr);
       setGenerating(false);
