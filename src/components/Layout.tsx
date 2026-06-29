@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Settings, Zap, BarChart2, List, Users, Activity, LogOut, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bell, Settings, BarChart2, List, Users, Activity, LogOut, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import logoSvg from '../assets/logo.svg';
 import { cn } from '../lib/utils';
 import { useAuthStore } from '../store/useAuthStore';
 import { useStore } from '../store/useStore';
@@ -66,9 +67,7 @@ export function Layout({ children }: LayoutProps) {
         {/* Logo */}
         <div className="px-4 py-5 flex items-center justify-between">
           <Link to="/accounts" className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 bg-gradient-to-br from-violet-600 to-violet-800 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm shadow-violet-300">
-              <Zap className="w-4 h-4 text-white fill-white" />
-            </div>
+            <img src={logoSvg} className="w-8 h-8 flex-shrink-0" alt="SignalIQ" />
             {!collapsed && (
               <span className="font-extrabold text-gray-900 text-[15px] tracking-tight truncate">SignalIQ</span>
             )}

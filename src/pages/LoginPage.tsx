@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Zap } from 'lucide-react';
+import logoSvg from '../assets/logo.svg';
 import { useAuthStore } from '../store/useAuthStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -33,9 +33,7 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-10 h-10 bg-violet-700 rounded-xl flex items-center justify-center mb-3">
-            <Zap className="w-5 h-5 text-white fill-white" />
-          </div>
+          <img src={logoSvg} className="w-12 h-12 mb-1" alt="SignalIQ" />
           <h1 className="text-xl font-semibold text-gray-900 tracking-tight">SignalIQ</h1>
           <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
         </div>
