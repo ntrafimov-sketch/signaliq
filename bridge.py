@@ -28,7 +28,9 @@ CLAUDE_APP = "Claude"
 
 def paste_prompt_to_claude(prompt: str) -> None:
     """Low-level: paste a prompt string into a new Claude Desktop chat."""
-    prompt_escaped = prompt.replace("\\", "\\\\").replace('"', '\\"')
+    # Write prompt to clipboard via pbcopy — avoids AppleScript string escaping issues
+    subprocess.run(["pbcopy"], input=prompt.encode("utf-8"), check=True)
+
     script = f"""
 set prevApp to (path to frontmost application as text)
 
@@ -44,7 +46,6 @@ tell application "System Events"
         delay 0.5
         keystroke "n" using command down
         delay 0.8
-        set the clipboard to "{prompt_escaped}"
         keystroke "v" using command down
         delay 0.3
         key code 36
@@ -92,7 +93,6 @@ def trigger_claude(data: dict) -> None:
         parts.append(f"LinkedIn: {data['linkedin']}")
 
     prompt = "/torpedo-research-agent " + ", ".join(parts)
-    prompt_escaped = prompt.replace("\\", "\\\\").replace('"', '\\"')
 
     # Save image to temp file if provided
     img_path = None
@@ -102,6 +102,9 @@ def trigger_claude(data: dict) -> None:
         tmp.write(img_data)
         tmp.close()
         img_path = tmp.name
+
+    # Write prompt to clipboard via pbcopy — avoids AppleScript string escaping issues
+    subprocess.run(["pbcopy"], input=prompt.encode("utf-8"), check=True)
 
     # Build AppleScript — paste text prompt, then paste image if provided
     img_block = ""
@@ -129,7 +132,6 @@ tell application "System Events"
         delay 0.5
         keystroke "n" using command down
         delay 0.8
-        set the clipboard to "{prompt_escaped}"
         keystroke "v" using command down{img_block}
         delay 0.3
         key code 36
