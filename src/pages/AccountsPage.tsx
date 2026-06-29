@@ -58,15 +58,12 @@ function getHeadcount(account: Account): number {
   for (const entry of (account.torpedoData ?? []) as any[]) {
     if (entry?.type === 'company_intel') {
       const d = entry.data || {};
-      let fallback = 0;
       for (const [key, val] of Object.entries(d)) {
-        if (USER_KEY.test(key)) continue;           // skip user/subscriber counts
+        if (!EMPLOYEE_KEY.test(key)) continue;      // only explicit employee fields
+        if (USER_KEY.test(key)) continue;           // skip if also matches user pattern
         const n = parseEmployeeCount(val);
-        if (n < 1 || n > 50_000) continue;          // outside realistic headcount range
-        if (EMPLOYEE_KEY.test(key)) return n;        // strong match — return immediately
-        if (!fallback) fallback = n;                 // weak match — keep as fallback
+        if (n >= 1 && n <= 50_000) return n;
       }
-      if (fallback) return fallback;
     }
   }
   if (account.employees > 0 && account.employees <= 50_000) return account.employees;
