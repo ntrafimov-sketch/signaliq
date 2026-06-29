@@ -28,8 +28,11 @@ CLAUDE_APP = "Claude"
 
 def paste_prompt_to_claude(prompt: str) -> None:
     """Low-level: paste a prompt string into a new Claude Desktop chat."""
-    # Write prompt to clipboard via pbcopy — avoids AppleScript string escaping issues
-    subprocess.run(["pbcopy"], input=prompt.encode("utf-8"), check=True)
+    # Write prompt to a temp file, then pbcopy inside AppleScript (right before paste)
+    tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
+    tmp.write(prompt)
+    tmp.close()
+    tmp_path = tmp.name.replace("\\", "\\\\").replace('"', '\\"')
 
     script = f"""
 set prevApp to (path to frontmost application as text)
@@ -46,6 +49,8 @@ tell application "System Events"
         delay 0.5
         keystroke "n" using command down
         delay 0.8
+        do shell script "cat " & quoted form of "{tmp_path}" & " | pbcopy"
+        delay 0.2
         keystroke "v" using command down
         delay 0.3
         key code 36
@@ -53,6 +58,7 @@ tell application "System Events"
 end tell
 
 tell application (prevApp) to activate
+do shell script "rm -f " & quoted form of "{tmp_path}"
 """
     subprocess.run(["osascript", "-e", script], check=True)
 
@@ -103,10 +109,13 @@ def trigger_claude(data: dict) -> None:
         tmp.close()
         img_path = tmp.name
 
-    # Write prompt to clipboard via pbcopy — avoids AppleScript string escaping issues
-    subprocess.run(["pbcopy"], input=prompt.encode("utf-8"), check=True)
+    # Write prompt to temp file for clipboard (avoids AppleScript escaping issues)
+    tmp_prompt = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
+    tmp_prompt.write(prompt)
+    tmp_prompt.close()
+    tmp_prompt_path = tmp_prompt.name
 
-    # Build AppleScript — paste text prompt, then paste image if provided
+    # Build AppleScript — pbcopy inside AppleScript right before paste
     img_block = ""
     if img_path:
         safe_path = img_path.replace("\\", "\\\\").replace('"', '\\"')
@@ -117,6 +126,7 @@ def trigger_claude(data: dict) -> None:
         keystroke "v" using command down
         delay 0.3"""
 
+    safe_tmp = tmp_prompt_path.replace("\\", "\\\\").replace('"', '\\"')
     script = f"""
 set prevApp to (path to frontmost application as text)
 
@@ -132,6 +142,8 @@ tell application "System Events"
         delay 0.5
         keystroke "n" using command down
         delay 0.8
+        do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
+        delay 0.2
         keystroke "v" using command down{img_block}
         delay 0.3
         key code 36
@@ -139,12 +151,15 @@ tell application "System Events"
 end tell
 
 tell application (prevApp) to activate
+do shell script "rm -f " & quoted form of "{safe_tmp}"
 """
     try:
         subprocess.run(["osascript", "-e", script], check=True)
     finally:
         if img_path and os.path.exists(img_path):
             os.unlink(img_path)
+        if os.path.exists(tmp_prompt_path):
+            os.unlink(tmp_prompt_path)
 
 
 class Handler(BaseHTTPRequestHandler):
