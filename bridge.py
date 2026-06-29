@@ -40,12 +40,8 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        try
-            click button "Chat" of window 1
-            delay 0.3
-        end try
-        keystroke "n" using command down
-        delay 0.6
+        click menu item "New Conversation" of menu "File" of menu bar 1
+        delay 1.0
         set the clipboard to "{prompt_escaped}"
         keystroke "v" using command down
         delay 0.3
