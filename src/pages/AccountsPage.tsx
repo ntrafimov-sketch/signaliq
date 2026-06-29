@@ -261,7 +261,7 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
 }
 
 export function AccountsPage() {
-  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount, profile } = useStore();
+  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount } = useStore();
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [sortField, setSortField] = useState<SortField>('score');
