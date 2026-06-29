@@ -43,6 +43,38 @@ function CompanyLogo({ company }: { company: string }) {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeSequenceResult(raw: any): SequenceResult | null {
+  if (!raw) return null;
+  const stepsRaw: any[] = raw.sequence || raw.stages || raw.touches || [];
+  if (stepsRaw.length === 0) return raw as SequenceResult;
+  const leadData: Record<string, string> = raw.lead_data || {};
+  let emailNum = 0;
+  let dmNum = 0;
+  const sequence: SequenceStep[] = stepsRaw.map((s: any) => {
+    const ch = (s.channel || '').toLowerCase() as 'email' | 'linkedin';
+    // Already normalized step
+    if (s.touch_type && (s.body || s.script || s.content !== undefined)) return s as SequenceStep;
+    const step: SequenceStep = {
+      day: s.day,
+      channel: ch,
+      touch_type: s.type || s.touch_type || (ch === 'email' ? 'email' : 'linkedin_message'),
+    };
+    if (ch === 'email') {
+      emailNum++;
+      step.email_number = emailNum;
+      step.body = s.body || (s.body_key ? leadData[s.body_key] : leadData[`email_${emailNum}_body`]);
+      step.subject = s.subject || (s.subject_key ? leadData[s.subject_key] : leadData[`email_${emailNum}_subject`]);
+    } else {
+      const noteText = s.notes || s.note || s.script || null;
+      if (noteText) { dmNum++; step.dm_number = dmNum; step.script = noteText; }
+      step.content = noteText;
+    }
+    return step;
+  });
+  return { ...raw, sequence };
+}
+
 export function PersonDetailPage() {
   const { id, personId } = useParams<{ id: string; personId: string }>();
   const navigate = useNavigate();
@@ -56,54 +88,28 @@ export function PersonDetailPage() {
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
 
-  const [sequenceResult, setSequenceResult] = useState<SequenceResult | null>(person?.sequenceResult ?? null);
+  const [sequenceResult, setSequenceResult] = useState<SequenceResult | null>(() =>
+    normalizeSequenceResult(person?.sequenceResult ?? null)
+  );
 
   // Listen for sequence results pushed via Clay → Railway webhook → WebSocket
   useEffect(() => {
     if (!id || !personId) return;
     return subscribeSequenceResult((accountId, pId, result) => {
       if (accountId !== id || pId !== personId) return;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw = result as any;
-      // Normalize various cold-email-master output formats → SequenceResult
-      // Supported: stages[]+lead_data{}, touches[], sequence[] (already correct)
-      const stepsRaw: any[] = raw.sequence || raw.stages || raw.touches || [];
-      if (!raw.sequence || raw.stages || raw.touches) {
-        const leadData: Record<string, string> = raw.lead_data || {};
-        let emailNum = 0;
-        let dmNum = 0;
-        raw.sequence = stepsRaw.map((s: any) => {
-          const ch = (s.channel || '').toLowerCase() as 'email' | 'linkedin';
-          const step: SequenceStep = {
-            day: s.day,
-            channel: ch,
-            touch_type: s.type || s.touch_type || (ch === 'email' ? 'email' : 'linkedin_message'),
-          };
-          if (ch === 'email') {
-            emailNum++;
-            step.email_number = emailNum;
-            // body may be inline or referenced via body_key into lead_data
-            step.body = s.body || (s.body_key ? leadData[s.body_key] : leadData[`email_${emailNum}_body`]);
-            step.subject = s.subject || (s.subject_key ? leadData[s.subject_key] : leadData[`email_${emailNum}_subject`]);
-          } else {
-            const noteText = s.notes || s.note || s.script || null;
-            if (noteText) {
-              dmNum++;
-              step.dm_number = dmNum;
-              step.script = noteText;
-            }
-            step.content = noteText;
-          }
-          return step;
-        });
-      }
-      const sr = raw as SequenceResult;
+      const sr = normalizeSequenceResult(result)!;
       setSequenceResult(sr);
       setGenerating(false);
-      updateAccount(id, {
+      // Use getState() to avoid stale closure on account
+      const currentAccount = useStore.getState().accounts.find(a => a.id === id);
+      if (currentAccount) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        people: (account as any).people.map((p: any) => p.id === personId ? { ...p, sequenceResult: sr } : p),
-      });
+        updateAccount(id, {
+          people: (currentAccount as any).people.map((p: any) =>
+            p.id === personId ? { ...p, sequenceResult: sr } : p
+          ),
+        });
+      }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, personId]);
