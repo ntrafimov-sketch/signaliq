@@ -31,6 +31,18 @@ export function importTorpedoJson(
   const revByDate = new Map<string, { ios: number; android: number }>();
   const dlByDate = new Map<string, { ios: number; android: number }>();
 
+  // Scoring accumulators
+  let revTrendPct = 0;
+  let dlTrendPct = 0;
+  let hubspotOpens = 0;
+  let hubspotClicks = 0;
+  let hubspotDemos = 0;
+  let jobPostingCount = 0;
+  let contactCount = 0;
+  let hasPaywall = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let investmentRounds: any[] = [];
+
   for (const entry of entries) {
     if (!entry || !entry.type || entry.data === undefined) continue;
     switch (entry.type) {
@@ -66,6 +78,7 @@ export function importTorpedoJson(
       case 'investments': {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rounds = Array.isArray(entry.data) ? entry.data : [];
+        investmentRounds = rounds;
         updates.investmentHistory = rounds.map((r: any) => ({
           round: r.round || r.stage || 'Investment',
           amount: r.amount_usd ? fmt(r.amount_usd) : (r.amount || ''),
@@ -110,6 +123,7 @@ export function importTorpedoJson(
             const recent = avg(revs.slice(-3));
             const prior = avg(revs.slice(-6, -3));
             const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
+            revTrendPct = Math.max(revTrendPct, pct);
             const abs = Math.abs(pct);
             const type = pct > 10 ? 'Revenue Increase' : pct < -10 ? 'Revenue Decrease' : 'Revenue Plateau';
             signals.push({
@@ -152,6 +166,7 @@ export function importTorpedoJson(
             const recent = avg(vals.slice(-3));
             const prior = avg(vals.slice(-6, -3));
             const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
+            dlTrendPct = Math.max(dlTrendPct, pct);
             const abs = Math.abs(pct);
             const type = pct > 10 ? 'Download Increase' : pct < -10 ? 'Download Decrease' : 'Download Plateau';
             signals.push({
@@ -199,7 +214,9 @@ export function importTorpedoJson(
 
       case 'products': {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        updates.products = (Array.isArray(entry.data) ? entry.data : []).map((p: any) => ({
+        const productList = Array.isArray(entry.data) ? entry.data : [];
+        if (productList.some((p: any) => p.has_in_app_purchases === true)) hasPaywall = true;
+        updates.products = productList.map((p: any) => ({
           app_name: p.app_name || p.name || '',
           platform: p.platform || 'both',
           has_in_app_purchases: p.has_in_app_purchases ?? null,
@@ -221,6 +238,7 @@ export function importTorpedoJson(
             ].filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i);
         const paywall = sdkList.filter(s => s.name && PAYWALL.some(p => s.name.toLowerCase().includes(p)));
         const lifecycle = sdkList.filter(s => s.name && LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
+        if (paywall.length) hasPaywall = true;
         if (paywall.length) {
           signals.push({
             id: genId(), accountId, accountName: companyName,
@@ -389,6 +407,7 @@ export function importTorpedoJson(
           : Array.isArray(d.openings) ? d.openings
           : [];
         const totalRoles = d.total_open_roles || jobs.length;
+        jobPostingCount += totalRoles;
         if (totalRoles > 0 || jobs.length > 0) {
           updates.jobOpenings = jobs.map((j: any) => ({
             title: j.title || j.job_title || j.role || '',
@@ -415,6 +434,9 @@ export function importTorpedoJson(
       case 'hubspot_company_engagement': {
         const d = entry.data;
         const totals = d.company_totals || {};
+        hubspotOpens += totals.total_opens || totals.opens || 0;
+        hubspotClicks += totals.total_clicks || totals.clicks || 0;
+        hubspotDemos += totals.total_conversion_events || totals.contacts_with_demos || 0;
         const contactsFound = totals.contacts_found || totals.total_contacts_found || 0;
         if (contactsFound || totals.total_sessions) {
           signals.push({
@@ -456,7 +478,8 @@ export function importTorpedoJson(
       }
 
       case 'signals': {
-        for (const s of entry.data as { signal: string; priority?: string; implication?: string; relevance?: string; detail?: string; why_now?: string }[]) {
+        for (const s of entry.data as { signal: string; type?: string; priority?: string; implication?: string; relevance?: string; detail?: string; why_now?: string }[]) {
+          if ((s.type || '').toLowerCase().includes('job')) jobPostingCount++;
           const impact = s.priority === 'HIGH' ? 'High' : s.priority === 'MEDIUM' ? 'Medium' : 'Low';
           const sigText = `${s.signal} ${s.detail || ''} ${s.implication || ''}`;
           const hiring = isHiringSignal(sigText);
@@ -474,6 +497,7 @@ export function importTorpedoJson(
       }
 
       case 'contacts': {
+        contactCount += Array.isArray(entry.data) ? entry.data.length : 0;
         const people: Person[] = (entry.data as {
           name: string;
           title?: string;
@@ -640,8 +664,63 @@ export function importTorpedoJson(
     });
   }
 
-  const highImpact = signals.filter(s => s.impact === 'High').length;
-  const score = Math.min(100, Math.round(40 + highImpact * 8 + signals.length * 2));
+  // === Scoring system ===
+
+  // 1. Paywall (+7): paywall SDK detected or product with IAP
+  const paywallScore = hasPaywall ? 7 : 0;
+
+  // 2. Revenue Scale (0–25): based on last month combined revenue
+  let revenueScore = 0;
+  if (totalMTR >= 1_000_000) revenueScore = 25;
+  else if (totalMTR >= 200_000) revenueScore = 18;
+  else if (totalMTR >= 50_000) revenueScore = 10;
+  else if (totalMTR >= 10_000) revenueScore = 5;
+
+  // 3. Growth Momentum (0–25): best of revenue/download trend
+  const trendPct = Math.max(revTrendPct, dlTrendPct);
+  let growthScore = 0;
+  if (trendPct >= 30) growthScore = 25;
+  else if (trendPct >= 10) growthScore = 18;
+  else if (trendPct >= -10) growthScore = 10;
+  else if (trendPct >= -20) growthScore = 5;
+  // < -20% = 0
+
+  // 4. HubSpot Engagement (0–15): opens + clicks weighted, demos bonus
+  let hubspotScore = 0;
+  if (hubspotDemos > 0) hubspotScore = 15;
+  else if (hubspotClicks > 0) hubspotScore = 10;
+  else if (hubspotOpens > 0) hubspotScore = 5;
+
+  // 5. Job Postings (0–10)
+  let jobScore = 0;
+  if (jobPostingCount >= 6) jobScore = 10;
+  else if (jobPostingCount >= 3) jobScore = 8;
+  else if (jobPostingCount >= 1) jobScore = 5;
+
+  // 6. Contacts (0–10): 0 / 1-3 / 4-10 / 11+
+  let contactScore = 0;
+  if (contactCount >= 11) contactScore = 10;
+  else if (contactCount >= 4) contactScore = 7;
+  else if (contactCount >= 1) contactScore = 3;
+
+  // 7. Investment (0–15): from investmentHistory dates in the JSON
+  // High season (Sep–Nov, Jan–Mar) = 15, Low season (Apr–Jun, Jul–Aug, Dec) = 7
+  let investScore = 0;
+  if (investmentRounds.length > 0) {
+    // Use most recent round
+    const sorted = [...investmentRounds].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const latest = sorted[0];
+    const monthStr = (latest.date || '').slice(5, 7);
+    const month = parseInt(monthStr, 10);
+    if (!isNaN(month)) {
+      const highSeasonMonths = [1, 2, 3, 9, 10, 11];
+      investScore = highSeasonMonths.includes(month) ? 15 : 7;
+    } else {
+      investScore = 7;
+    }
+  }
+
+  const score = Math.min(100, paywallScore + revenueScore + growthScore + hubspotScore + jobScore + contactScore + investScore);
   const scoreLabel = score >= 75 ? 'Hot' : score >= 50 ? 'Warm' : 'Cold';
 
   return {
