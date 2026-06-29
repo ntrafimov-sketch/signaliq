@@ -50,7 +50,7 @@ function parseEmployeeCount(raw: unknown): number {
   return parseInt(s.replace(/[^\d]/g, ''), 10) || 0;
 }
 
-const EMPLOYEE_KEY = /headcount|employ|staff|workforce|personnel|team.?size|company.?size/i;
+const EMPLOYEE_KEY = /headcount|employ|staff|workforce|personnel|team.?size|company.?size|\bsize\b/i;
 const USER_KEY = /\buser|subscriber|customer|download|install|dau|mau|active|register|member|player|listener/i;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,10 +58,16 @@ function getHeadcount(account: Account): number {
   for (const entry of (account.torpedoData ?? []) as any[]) {
     if (entry?.type === 'company_intel') {
       const d = entry.data || {};
+      // Pass 1: strong employee-named fields (headcount, staff, size, etc.)
       for (const [key, val] of Object.entries(d)) {
-        if (!EMPLOYEE_KEY.test(key)) continue;      // only explicit employee fields
-        if (USER_KEY.test(key)) continue;           // skip if also matches user pattern
+        if (!EMPLOYEE_KEY.test(key)) continue;
+        if (USER_KEY.test(key)) continue;
         const n = parseEmployeeCount(val);
+        if (n >= 1 && n <= 50_000) return n;
+      }
+      // Pass 2: 'employees' field — use only if value looks like headcount (< 50k)
+      if (d.employees != null) {
+        const n = parseEmployeeCount(d.employees);
         if (n >= 1 && n <= 50_000) return n;
       }
     }
