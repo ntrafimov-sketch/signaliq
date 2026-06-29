@@ -44,8 +44,70 @@ function CompanyLogo({ company }: { company: string }) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildSequenceFromFlatData(data: Record<string, string>): SequenceStep[] {
+  const steps: SequenceStep[] = [];
+  // Collect email keys: email_1, email_2, email_2b_1, email_2b_2, etc.
+  const emailKeys = Object.keys(data)
+    .filter(k => k.match(/^email_\d/))
+    .map(k => k.replace(/_body$|_subject$/, ''))
+    .filter((k, i, a) => a.indexOf(k) === i)
+    .sort();
+  // Collect dm keys: dm_1, dm_2, ...
+  const dmKeys = Object.keys(data)
+    .filter(k => k.match(/^dm_\d+$/))
+    .sort((a, b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+
+  // Interleave: email, dm, email, dm...
+  const allSteps = [...emailKeys.map(k => ({ type: 'email', key: k })),
+                    ...dmKeys.map(k => ({ type: 'dm', key: k }))]
+    .sort((a, b) => {
+      // Sort by primary number embedded in key
+      const na = parseInt(a.key.replace(/\D/g, '') || '0');
+      const nb = parseInt(b.key.replace(/\D/g, '') || '0');
+      return na - nb || a.key.localeCompare(b.key);
+    });
+
+  let day = 1;
+  let emailNum = 0; let dmNum = 0;
+  for (const s of allSteps) {
+    if (s.type === 'email') {
+      emailNum++;
+      steps.push({
+        day, channel: 'email', touch_type: 'email',
+        email_number: emailNum,
+        subject: data[`${s.key}_subject`],
+        body: data[`${s.key}_body`],
+      });
+      day += 3;
+    } else {
+      dmNum++;
+      steps.push({
+        day, channel: 'linkedin', touch_type: 'linkedin_message',
+        dm_number: dmNum,
+        script: data[s.key],
+      });
+      day += 2;
+    }
+  }
+  // Voice steps
+  Object.keys(data).filter(k => k.match(/^voice_\d+$/)).sort().forEach(k => {
+    steps.push({ day, channel: 'linkedin', touch_type: 'voice_note', script: data[k] });
+    day += 2;
+  });
+  return steps;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeSequenceResult(raw: any): SequenceResult | null {
   if (!raw) return null;
+
+  // Format 5: flat data object with email_N_body / dm_N keys, no sequence array
+  const flatData = raw.data;
+  if (flatData && typeof flatData === 'object' && !Array.isArray(flatData) &&
+      !raw.sequence && !raw.stages && !raw.touches && !raw.sequence_structure) {
+    const sequence = buildSequenceFromFlatData(flatData as Record<string, string>);
+    if (sequence.length > 0) return { ...raw, sequence } as SequenceResult;
+  }
 
   // Format 3: sequence_structure[] + emails{} + linkedin_touches{}
   if (!raw.sequence && raw.sequence_structure) {
