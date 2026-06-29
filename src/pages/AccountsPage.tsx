@@ -61,6 +61,7 @@ function getHeadcount(account: Account): number {
   for (const entry of (account.torpedoData ?? []) as any[]) {
     if (entry?.type === 'company_intel') {
       const d = entry.data || {};
+      console.log(`[headcount] ${account.company_name} keys:`, Object.keys(d));
       // Pass 1: strong employee-named fields (headcount, staff, size, etc.)
       for (const [key, val] of Object.entries(d)) {
         if (!EMPLOYEE_KEY.test(key)) continue;
