@@ -304,15 +304,23 @@ export function AccountsPage() {
     return () => unsub();
   }, []);
 
-  // Load shared accounts from server on connect
+  // Load shared accounts from server on connect; migrate local accounts if server is empty
   useEffect(() => {
     const unsub = subscribeInit((serverAccounts) => {
       if (serverAccounts.length > 0) {
         setAccounts(serverAccounts as Account[]);
+      } else {
+        // Server is empty — upload existing local accounts to seed shared storage
+        const localAccounts = useStore.getState().accounts;
+        const t = useAuthStore.getState().token;
+        if (localAccounts.length > 0 && t) {
+          Promise.all(localAccounts.map(a => syncAccount(a, t)));
+        }
       }
     });
     return () => unsub();
-  }, [setAccounts]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keep a ref to latest accounts so the webhook handler never captures stale closure
   const accountsRef = useRef(accounts);
