@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, Download, RefreshCw,
   Calendar, MessageSquare, Briefcase, ChevronDown, ChevronRight, ExternalLink,
-  Newspaper, TrendingUp, ImagePlus, Snowflake, Sun, Leaf, Flower2
+  Newspaper, TrendingUp, ImagePlus, Snowflake, Sun, Leaf, Flower2, StickyNote
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -13,6 +13,7 @@ import { MetricChart } from '../components/MetricChart';
 import { OrgChart } from '../components/OrgChart';
 import { SignalCategoryBadge, ConfidenceBadge } from '../components/SignalBadge';
 import { useStore } from '../store/useStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { importTorpedoJson } from '../services/importTorpedo';
 import { cn } from '../lib/utils';
 import type { Person, Signal, SignalCategory } from '../types';
@@ -143,6 +144,23 @@ export function AccountDetailPage() {
   const [peopleView, setPeopleView] = useState<'contacts' | 'org'>('contacts');
   const [jsonPasteError, setJsonPasteError] = useState('');
   const jsonTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [notes, setNotes] = useState(account?.notes ?? '');
+  const [notesSaved, setNotesSaved] = useState(false);
+  const authToken = useAuthStore(s => s.token);
+  const BACKEND = import.meta.env.VITE_BACKEND_URL || '';
+
+  const saveNotes = useCallback((value: string) => {
+    updateAccount(id!, { notes: value });
+    if (authToken) {
+      fetch(`${BACKEND}/api/accounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ ...account, notes: value }),
+      }).catch(() => {});
+    }
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
+  }, [id, account, updateAccount, BACKEND, authToken]);
 
   if (!account) {
     return (
@@ -245,6 +263,25 @@ export function AccountDetailPage() {
             }} />
           </div>
         </div>
+      </div>
+
+      {/* Notes / Action Plan */}
+      <div className="bg-white rounded-xl border border-violet-100 shadow-sm p-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <StickyNote className="w-4 h-4 text-violet-400" />
+            <span className="text-sm font-semibold text-gray-700">Notes & Action Plan</span>
+          </div>
+          {notesSaved && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
+        </div>
+        <textarea
+          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-300 resize-none transition-colors"
+          rows={3}
+          placeholder="What's the plan? Next steps, context, who's reaching out…"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          onBlur={e => { if (e.target.value !== (account.notes ?? '')) saveNotes(e.target.value); }}
+        />
       </div>
 
       {/* JSON Paste Modal */}

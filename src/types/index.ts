@@ -59,6 +59,7 @@ export interface Account {
   lastUpdated: string;
   addedAt?: string;
   addedBy?: string;
+  notes?: string;
   description: string;
   founded: string;
   hq: string;
