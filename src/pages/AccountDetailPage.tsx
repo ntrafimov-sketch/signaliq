@@ -275,7 +275,7 @@ export function AccountDetailPage() {
           {notesSaved && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
         </div>
         <textarea
-          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-300 resize-none transition-colors"
+          className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-300 resize-y min-h-[72px] transition-colors"
           rows={3}
           placeholder="What's the plan? Next steps, context, who's reaching out…"
           value={notes}
