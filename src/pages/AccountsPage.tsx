@@ -350,18 +350,27 @@ export function AccountsPage() {
     return () => unsub();
   }, []);
 
-  // Load shared accounts from server on connect; migrate local accounts if server is empty
+  // Load shared accounts from server on connect; merge with local to avoid data loss on server restart
   useEffect(() => {
     const unsub = subscribeInit((serverAccounts) => {
-      if (serverAccounts.length > 0) {
-        setAccounts(serverAccounts as Account[]);
-      } else {
-        // Server is empty — upload existing local accounts to seed shared storage
-        const localAccounts = useStore.getState().accounts;
-        const t = useAuthStore.getState().token;
+      const localAccounts = useStore.getState().accounts;
+      const t = useAuthStore.getState().token;
+      if (serverAccounts.length === 0) {
+        // Server empty — upload all local accounts to seed shared storage
         if (localAccounts.length > 0 && t) {
           Promise.all(localAccounts.map(a => syncAccount(a, t)));
         }
+        return;
+      }
+      // Merge: server accounts win on conflict, but local-only accounts get re-uploaded
+      const serverIds = new Set((serverAccounts as Account[]).map(a => a.id));
+      const localOnly = localAccounts.filter(a => !serverIds.has(a.id));
+      // Merge local-only accounts into the server list
+      const merged = [...(serverAccounts as Account[]), ...localOnly];
+      setAccounts(merged);
+      // Re-upload any local-only accounts so server stays in sync
+      if (localOnly.length > 0 && t) {
+        Promise.all(localOnly.map(a => syncAccount(a, t)));
       }
     });
     return () => unsub();
