@@ -26,16 +26,43 @@ PORT = 7337
 CLAUDE_APP = "Claude"
 
 
+def dump_ui_tree() -> str:
+    """Dump top-level UI groups of Claude Desktop window for diagnostics."""
+    script = f"""
+tell application "System Events"
+    tell process "{CLAUDE_APP}"
+        set w to window 1
+        set out to ""
+        set grps to groups of w
+        repeat with i from 1 to count of grps
+            set g to item i of grps
+            set out to out & "G" & i & ": role=" & role of g & " desc=" & description of g & " title=" & title of g & "\\n"
+            try
+                set subs to groups of g
+                repeat with j from 1 to count of subs
+                    set sg to item j of subs
+                    set out to out & "  G" & i & "." & j & ": role=" & role of sg & " desc=" & description of sg & "\\n"
+                    try
+                        set subs2 to groups of sg
+                        repeat with k from 1 to count of subs2
+                            set sg2 to item k of subs2
+                            set out to out & "    G" & i & "." & j & "." & k & ": desc=" & description of sg2 & " title=" & title of sg2 & "\\n"
+                        end repeat
+                    end try
+                end repeat
+            end try
+        end repeat
+        return out
+    end tell
+end tell
+"""
+    r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
+    return r.stdout.strip() or r.stderr.strip()
+
+
 def open_new_home_chat() -> None:
     """Open a new Home chat in Claude Desktop."""
     import time as _time
-    # Press Ctrl+Tab to cycle to Home tab if Code is currently active
-    # (Electron apps use Ctrl+Tab for tab cycling)
-    subprocess.run(["osascript", "-e",
-        f'tell application "System Events" to tell process "{CLAUDE_APP}" to key code 48 using control down'],
-        capture_output=True)
-    _time.sleep(0.3)
-    # Open new chat
     subprocess.run(["osascript", "-e",
         f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "n" using command down'],
         capture_output=True)
@@ -189,6 +216,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(b'{"ok":true}')
+        elif self.path == "/debug":
+            tree = dump_ui_tree()
+            self.send_response(200)
+            self._cors()
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(tree.encode())
+            print(f"  UI tree:\n{tree}")
         else:
             self.send_response(404)
             self.end_headers()
