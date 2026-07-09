@@ -26,25 +26,52 @@ PORT = 7337
 CLAUDE_APP = "Claude"
 
 
+def click_home_tab() -> None:
+    """Click the Home tab in Claude Desktop using CoreGraphics (bypasses AppleScript UI tree)."""
+    # Get window position via AppleScript, then click Home tab via Python/Quartz
+    result = subprocess.run(
+        ["osascript", "-e",
+         f'tell application "System Events" to tell process "{CLAUDE_APP}" to get position of window 1'],
+        capture_output=True, text=True
+    )
+    pos = result.stdout.strip().split(", ")
+    if len(pos) == 2:
+        try:
+            win_x, win_y = int(pos[0]), int(pos[1])
+            home_x = win_x + 103
+            home_y = win_y + 68
+            script = f"""
+import Quartz, time
+pt = ({home_x}, {home_y})
+for etype in (Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp):
+    e = Quartz.CGEventCreateMouseEvent(None, etype, pt, Quartz.kCGMouseButtonLeft)
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap, e)
+    time.sleep(0.05)
+"""
+            subprocess.run(["python3", "-c", script], check=True)
+        except Exception:
+            pass
+
+
 def paste_prompt_to_claude(prompt: str) -> None:
     """Low-level: paste a prompt string into a new Claude Desktop chat."""
-    # Write prompt to temp file to avoid AppleScript escaping issues
     tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8')
     tmp.write(prompt)
     tmp.close()
     tmp_path = tmp.name
 
     safe_tmp = tmp_path.replace("\\", "\\\\").replace('"', '\\"')
+
+    # Activate Claude and click Home tab
+    subprocess.run(["osascript", "-e", f'tell application "{CLAUDE_APP}" to activate'])
+    import time as _time
+    _time.sleep(0.5)
+    click_home_tab()
+    _time.sleep(0.4)
+
     script = f"""
-set prevApp to (path to frontmost application as text)
-tell application "{CLAUDE_APP}"
-    activate
-end tell
-delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        click group 2 of group 1 of group 1 of group 1 of group 1 of window 1
-        delay 0.4
         keystroke "n" using command down
         delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
@@ -127,19 +154,16 @@ def trigger_claude(data: dict) -> None:
         delay 0.3"""
 
     safe_tmp = tmp_prompt_path.replace("\\", "\\\\").replace('"', '\\"')
+
+    subprocess.run(["osascript", "-e", f'tell application "{CLAUDE_APP}" to activate'])
+    import time as _time
+    _time.sleep(0.5)
+    click_home_tab()
+    _time.sleep(0.4)
+
     script = f"""
-set prevApp to (path to frontmost application as text)
-
-tell application "{CLAUDE_APP}"
-    activate
-end tell
-
-delay 0.5
-
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        click group 2 of group 1 of group 1 of group 1 of group 1 of window 1
-        delay 0.4
         keystroke "n" using command down
         delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
