@@ -38,7 +38,7 @@ def click_home_tab() -> None:
     if len(pos) == 2:
         try:
             win_x, win_y = int(pos[0]), int(pos[1])
-            home_x = win_x + 103
+            home_x = win_x + 60
             home_y = win_y + 68
             script = f"""
 import Quartz, time
