@@ -43,6 +43,11 @@ end tell
 delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
+        -- Switch to Home tab (chat mode) if Code tab is active
+        try
+            click button "Home" of toolbar 1 of window 1
+            delay 0.3
+        end try
         keystroke "1" using command down
         delay 0.5
         keystroke "n" using command down
@@ -138,6 +143,11 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
+        -- Switch to Home tab (chat mode) if Code tab is active
+        try
+            click button "Home" of toolbar 1 of window 1
+            delay 0.3
+        end try
         keystroke "1" using command down
         delay 0.5
         keystroke "n" using command down
