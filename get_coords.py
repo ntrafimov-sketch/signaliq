@@ -3,19 +3,27 @@ import subprocess
 
 input("Наведи мышь на Home таб в Claude Desktop и нажми Enter...")
 
-# Get mouse position via JXA (JavaScript for Automation — no extra modules needed)
-mouse = subprocess.run(
-    ["osascript", "-l", "JavaScript", "-e",
-     "ObjC.import('AppKit'); var loc = $.NSEvent.mouseLocation; loc.x + ',' + loc.y"],
-    capture_output=True, text=True
-)
+r = subprocess.run(["osascript", "-l", "JavaScript", "-e", """
+ObjC.import('AppKit');
+var loc = $.NSEvent.mouseLocation;
+var screen = $.NSScreen.mainScreen.frame;
+var screenH = screen.size.height;
+// Convert AppKit (bottom-left origin) to AppleScript (top-left origin)
+var asY = screenH - loc.y;
+var asX = loc.x;
 
-# Get Claude window position and size
-win = subprocess.run(
-    ["osascript", "-e",
-     'tell application "System Events" to tell process "Claude" to return (position of window 1) & (size of window 1)'],
-    capture_output=True, text=True
-)
+var app = Application('System Events');
+var claude = app.processes.whose({name: 'Claude'})[0];
+var win = claude.windows[0];
+var pos = win.position();
+var sz = win.size();
 
-print("Mouse (screen coords):", mouse.stdout.strip() or mouse.stderr.strip())
-print("Window pos+size:", win.stdout.strip() or win.stderr.strip())
+var offsetX = Math.round(asX - pos[0]);
+var offsetY = Math.round(asY - pos[1]);
+
+'Mouse AS coords: ' + Math.round(asX) + ',' + Math.round(asY) +
+'\\nWindow pos: ' + pos[0] + ',' + pos[1] + ' size: ' + sz[0] + 'x' + sz[1] +
+'\\nOffset from window top-left: x+' + offsetX + ', y+' + offsetY;
+"""], capture_output=True, text=True)
+
+print(r.stdout.strip() or r.stderr.strip())
