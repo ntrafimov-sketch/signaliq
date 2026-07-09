@@ -43,18 +43,7 @@ end tell
 delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        try
-            click radio button "Home" of window 1
-        end try
-        try
-            click radio button 1 of radio group 1 of window 1
-        end try
-        try
-            click radio button "Home" of radio group 1 of window 1
-        end try
-        try
-            click radio button "Home" of group 1 of window 1
-        end try
+        click group 1 of group 1 of group 1 of group 1 of group 1 of window 1
         delay 0.4
         keystroke "n" using command down
         delay 1.5
@@ -149,18 +138,7 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        try
-            click radio button "Home" of window 1
-        end try
-        try
-            click radio button 1 of radio group 1 of window 1
-        end try
-        try
-            click radio button "Home" of radio group 1 of window 1
-        end try
-        try
-            click radio button "Home" of group 1 of window 1
-        end try
+        click group 1 of group 1 of group 1 of group 1 of group 1 of window 1
         delay 0.4
         keystroke "n" using command down
         delay 1.5
