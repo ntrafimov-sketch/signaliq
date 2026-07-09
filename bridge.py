@@ -43,10 +43,34 @@ end tell
 delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        set winPos to position of window 1
-        set homeX to (item 1 of winPos) + 100
-        set homeY to (item 2 of winPos) + 70
-        click at {{homeX, homeY}}
+        set w to window 1
+        -- Try every known button name and path depth
+        repeat with btnName in {{"Home", "Chat"}}
+            try
+                click button btnName of w
+            end try
+            try
+                click button btnName of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 1 of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 1 of group 1 of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 2 of group 1 of group 1 of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 2 of group 1 of group 1 of group 1 of group 1 of w
+            end try
+        end repeat
         delay 0.5
         keystroke "n" using command down
         delay 1.5
@@ -141,10 +165,33 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        set winPos to position of window 1
-        set homeX to (item 1 of winPos) + 100
-        set homeY to (item 2 of winPos) + 70
-        click at {{homeX, homeY}}
+        set w to window 1
+        repeat with btnName in {{"Home", "Chat"}}
+            try
+                click button btnName of w
+            end try
+            try
+                click button btnName of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 1 of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 1 of group 1 of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 2 of group 1 of group 1 of group 1 of group 1 of w
+            end try
+            try
+                click button btnName of group 1 of group 2 of group 1 of group 1 of group 1 of group 1 of w
+            end try
+        end repeat
         delay 0.5
         keystroke "n" using command down
         delay 1.5
