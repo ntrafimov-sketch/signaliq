@@ -27,42 +27,49 @@ CLAUDE_APP = "Claude"
 
 
 def dump_ui_tree() -> str:
-    """Dump top-level UI groups of Claude Desktop window for diagnostics."""
+    """Dump UI elements of Claude Desktop window for diagnostics."""
     script = f"""
 tell application "System Events"
     tell process "{CLAUDE_APP}"
         set w to window 1
-        set out to ""
-        set grps to groups of w
-        repeat with i from 1 to count of grps
-            set g to item i of grps
-            set out to out & "G" & i & ": role=" & role of g & " desc=" & description of g & " title=" & title of g & "\\n"
+        set out to "=== entire subtree of window 1 ===\\n"
+        -- Try every UI element type
+        set allElems to entire contents of w
+        set limit to 120
+        set cnt to 0
+        repeat with e in allElems
+            set cnt to cnt + 1
+            if cnt > limit then exit repeat
             try
-                set subs to groups of g
-                repeat with j from 1 to count of subs
-                    set sg to item j of subs
-                    set out to out & "  G" & i & "." & j & ": role=" & role of sg & " desc=" & description of sg & "\\n"
-                    try
-                        set subs2 to groups of sg
-                        repeat with k from 1 to count of subs2
-                            set sg2 to item k of subs2
-                            set out to out & "    G" & i & "." & j & "." & k & ": desc=" & description of sg2 & " title=" & title of sg2 & "\\n"
-                        end repeat
-                    end try
-                end repeat
+                set r to role of e
+                set d to description of e
+                set t to title of e
+                set v to value of e
+                set pos to position of e
+                set sz to size of e
+                set out to out & r & " | desc=" & d & " | title=" & t & " | val=" & v & " | pos=" & item 1 of pos & "," & item 2 of pos & " | size=" & item 1 of sz & "x" & item 2 of sz & "\\n"
+            on error
+                try
+                    set out to out & (role of e) & " | desc=" & (description of e) & "\\n"
+                end try
             end try
         end repeat
         return out
     end tell
 end tell
 """
-    r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=10)
+    r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=15)
     return r.stdout.strip() or r.stderr.strip()
 
 
 def open_new_home_chat() -> None:
     """Open a new Home chat in Claude Desktop."""
     import time as _time
+    # Press Escape to navigate back/up from Code tab to Home
+    subprocess.run(["osascript", "-e",
+        f'tell application "System Events" to tell process "{CLAUDE_APP}" to key code 53'],
+        capture_output=True)
+    _time.sleep(0.3)
     subprocess.run(["osascript", "-e",
         f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "n" using command down'],
         capture_output=True)
