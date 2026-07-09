@@ -44,7 +44,14 @@ delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
         click menu item "New Conversation" of menu "File" of menu bar 1
-        delay 1.0
+        delay 1.2
+        -- Click center of window to focus the input field
+        set winPos to position of window 1
+        set winSize to size of window 1
+        set clickX to (item 1 of winPos) + (item 1 of winSize) / 2
+        set clickY to (item 2 of winPos) + (item 2 of winSize) - 80
+        click at {{clickX, clickY}}
+        delay 0.3
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.3
         keystroke "v" using command down
@@ -137,7 +144,13 @@ delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
         click menu item "New Conversation" of menu "File" of menu bar 1
-        delay 0.8
+        delay 1.2
+        set winPos to position of window 1
+        set winSize to size of window 1
+        set clickX to (item 1 of winPos) + (item 1 of winSize) / 2
+        set clickY to (item 2 of winPos) + (item 2 of winSize) - 80
+        click at {{clickX, clickY}}
+        delay 0.3
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.2
         keystroke "v" using command down{img_block}
