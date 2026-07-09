@@ -63,16 +63,21 @@ end tell
 
 
 def open_new_home_chat() -> None:
-    """Open a new Home chat in Claude Desktop."""
+    """Click the Home tab then open a new chat."""
     import time as _time
-    # Press Escape to navigate back/up from Code tab to Home
-    subprocess.run(["osascript", "-e",
-        f'tell application "System Events" to tell process "{CLAUDE_APP}" to key code 53'],
-        capture_output=True)
-    _time.sleep(0.3)
-    subprocess.run(["osascript", "-e",
-        f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "n" using command down'],
-        capture_output=True)
+    script = f"""
+tell application "System Events"
+    tell process "{CLAUDE_APP}"
+        set winPos to position of window 1
+        set homeX to (item 1 of winPos) + 20
+        set homeY to (item 2 of winPos) + 45
+        click at {{homeX, homeY}}
+        delay 0.4
+        keystroke "n" using command down
+    end tell
+end tell
+"""
+    subprocess.run(["osascript", "-e", script], capture_output=True)
     _time.sleep(1.2)
 
 
