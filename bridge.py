@@ -43,12 +43,7 @@ end tell
 delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Navigate back to Home tab via View > Back
-        try
-            click menu item "Back" of menu "View" of menu bar 1
-        end try
-        delay 0.4
-        keystroke "n" using command down
+        do shell script "open 'claude://new'"
         delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.3
@@ -141,12 +136,7 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Navigate back to Home tab via View > Back
-        try
-            click menu item "Back" of menu "View" of menu bar 1
-        end try
-        delay 0.4
-        keystroke "n" using command down
+        do shell script "open 'claude://new'"
         delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.3
