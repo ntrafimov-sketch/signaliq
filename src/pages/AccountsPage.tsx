@@ -363,8 +363,10 @@ export function AccountsPage() {
         return;
       }
       // Merge: server accounts win on conflict, but local-only accounts get re-uploaded
+      // Dedup by both ID and domain to prevent duplicates when multiple users sync
       const serverIds = new Set((serverAccounts as Account[]).map(a => a.id));
-      const localOnly = localAccounts.filter(a => !serverIds.has(a.id));
+      const serverDomains = new Set((serverAccounts as Account[]).map(a => a.domain).filter(Boolean));
+      const localOnly = localAccounts.filter(a => !serverIds.has(a.id) && !serverDomains.has(a.domain));
       // Merge local-only accounts into the server list
       const merged = [...(serverAccounts as Account[]), ...localOnly];
       setAccounts(merged);
@@ -476,7 +478,17 @@ export function AccountsPage() {
   }, [addAccounts, updateAccount]);
 
 
-  const filtered = accounts
+  // Dedup by domain (keep the one with more data — higher score or more signals)
+  const deduped = accounts.reduce((acc, a) => {
+    const key = a.domain || a.id;
+    const existing = acc.get(key);
+    if (!existing || (a.score > existing.score) || (a.signals.length > existing.signals.length)) {
+      acc.set(key, a);
+    }
+    return acc;
+  }, new Map<string, Account>());
+
+  const filtered = [...deduped.values()]
     .filter(a => {
       if (search && !a.company_name.toLowerCase().includes(search.toLowerCase()) && !a.domain.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
