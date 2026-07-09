@@ -44,7 +44,11 @@ delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
         click menu item "New Conversation" of menu "File" of menu bar 1
-        delay 1.5
+    end tell
+end tell
+delay 2.0
+tell application "System Events"
+    tell process "{CLAUDE_APP}"
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.5
         keystroke "v" using command down
@@ -137,7 +141,11 @@ delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
         click menu item "New Conversation" of menu "File" of menu bar 1
-        delay 1.5
+    end tell
+end tell
+delay 2.0
+tell application "System Events"
+    tell process "{CLAUDE_APP}"
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.5
         keystroke "v" using command down{img_block}
