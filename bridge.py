@@ -27,23 +27,17 @@ CLAUDE_APP = "Claude"
 
 
 def open_new_home_chat() -> None:
-    """Open a new Home chat in Claude Desktop via the File menu (not Cmd+N which respects active tab)."""
-    # Clicking the menu item directly always triggers the Home "New Conversation" action
-    # regardless of whether Code tab is currently active
-    script = f"""
-tell application "System Events"
-    tell process "{CLAUDE_APP}"
-        click menu item "New Conversation" of menu "File" of menu bar 1
-    end tell
-end tell
-"""
-    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
-    if result.returncode != 0:
-        # Fallback: use keyboard shortcut (works when Home tab is already active)
-        subprocess.run(["osascript", "-e",
-            f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "n" using command down'],
-            capture_output=True)
+    """Open a new Home chat in Claude Desktop."""
     import time as _time
+    # Step 1: switch to Home tab via Cmd+1 (standard Electron first-tab shortcut)
+    subprocess.run(["osascript", "-e",
+        f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "1" using command down'],
+        capture_output=True)
+    _time.sleep(0.4)
+    # Step 2: open new chat (now that Home tab is active, Cmd+N opens a Home chat)
+    subprocess.run(["osascript", "-e",
+        f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "n" using command down'],
+        capture_output=True)
     _time.sleep(1.2)
 
 
@@ -245,6 +239,18 @@ if __name__ == "__main__":
             print("  ⚠️  Both 'Claude' and 'Claude Code' detected.")
             print(f"  → Targeting: '{CLAUDE_APP}'")
             print("  → If wrong, edit CLAUDE_APP at top of bridge.py\n")
+    except Exception:
+        pass
+
+    # Print Claude Desktop File menu items for diagnostics
+    try:
+        r = subprocess.run(
+            ["osascript", "-e",
+             f'tell application "System Events" to tell process "{CLAUDE_APP}" to get name of every menu item of menu "File" of menu bar 1'],
+            capture_output=True, text=True, timeout=5
+        )
+        if r.stdout.strip():
+            print(f"  Claude File menu items: {r.stdout.strip()}")
     except Exception:
         pass
 
