@@ -43,35 +43,11 @@ end tell
 delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        set w to window 1
-        -- Try every known button name and path depth
-        repeat with btnName in {{"Home", "Chat"}}
-            try
-                click button btnName of w
-            end try
-            try
-                click button btnName of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 1 of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 1 of group 1 of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 2 of group 1 of group 1 of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 2 of group 1 of group 1 of group 1 of group 1 of w
-            end try
-        end repeat
-        delay 0.5
+        -- Navigate back to Home tab via View > Back
+        try
+            click menu item "Back" of menu "View" of menu bar 1
+        end try
+        delay 0.4
         keystroke "n" using command down
         delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
@@ -165,34 +141,11 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        set w to window 1
-        repeat with btnName in {{"Home", "Chat"}}
-            try
-                click button btnName of w
-            end try
-            try
-                click button btnName of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 1 of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 1 of group 1 of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 2 of group 1 of group 1 of group 1 of group 1 of w
-            end try
-            try
-                click button btnName of group 1 of group 2 of group 1 of group 1 of group 1 of group 1 of w
-            end try
-        end repeat
-        delay 0.5
+        -- Navigate back to Home tab via View > Back
+        try
+            click menu item "Back" of menu "View" of menu bar 1
+        end try
+        delay 0.4
         keystroke "n" using command down
         delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
