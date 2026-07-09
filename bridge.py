@@ -43,24 +43,12 @@ end tell
 delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Click Home tab (top-left area of window)
-        set winPos to position of window 1
-        set homeX to (item 1 of winPos) + 100
-        set homeY to (item 2 of winPos) + 70
-        click at {{homeX, homeY}}
-        delay 0.4
         click menu item "New Conversation" of menu "File" of menu bar 1
-        delay 1.2
-        -- Click input field (bottom center of window)
-        set winSize to size of window 1
-        set clickX to (item 1 of winPos) + (item 1 of winSize) / 2
-        set clickY to (item 2 of winPos) + (item 2 of winSize) - 80
-        click at {{clickX, clickY}}
-        delay 0.3
+        delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
-        delay 0.3
+        delay 0.5
         keystroke "v" using command down
-        delay 0.3
+        delay 0.5
         key code 36
     end tell
 end tell
@@ -148,24 +136,12 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        -- Click Home tab (top-left area of window)
-        set winPos to position of window 1
-        set homeX to (item 1 of winPos) + 100
-        set homeY to (item 2 of winPos) + 70
-        click at {{homeX, homeY}}
-        delay 0.4
         click menu item "New Conversation" of menu "File" of menu bar 1
-        delay 1.2
-        -- Click input field (bottom center of window)
-        set winSize to size of window 1
-        set clickX to (item 1 of winPos) + (item 1 of winSize) / 2
-        set clickY to (item 2 of winPos) + (item 2 of winSize) - 80
-        click at {{clickX, clickY}}
-        delay 0.3
+        delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
-        delay 0.2
+        delay 0.5
         keystroke "v" using command down{img_block}
-        delay 0.3
+        delay 0.5
         key code 36
     end tell
 end tell
