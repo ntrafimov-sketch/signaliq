@@ -107,19 +107,37 @@ export function importTorpedoJson(
         for (const [store, points] of Object.entries(byStore)) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const filtered = points.filter((p: any) => !p.note?.includes('Partial'));
+          // Group by date: prefer WW record; if no WW, sum country-level records
+          const byDateMap = new Map<string, number>();
+          const wwByDate = new Map<string, number>();
           for (const p of filtered) {
-            const existing = revByDate.get(p.date) ?? { ios: 0, android: 0 };
-            if (store === 'ios') existing.ios = p.revenue || 0;
-            else existing.android = p.revenue || 0;
-            revByDate.set(p.date, existing);
+            const rev = (p.revenue as number) || 0;
+            const country = (p.country || '').toUpperCase();
+            if (country === 'WW') {
+              wwByDate.set(p.date, rev);
+            } else {
+              byDateMap.set(p.date, (byDateMap.get(p.date) ?? 0) + rev);
+            }
           }
-          if (filtered.length > 0) {
-            const lastRev = (filtered[filtered.length - 1].revenue as number) || 0;
+          // WW takes priority over summed country-level
+          const mergedDates = new Set([...wwByDate.keys(), ...byDateMap.keys()]);
+          const storeKey = store.toLowerCase().includes('ios') ? 'ios' : 'android';
+          for (const date of mergedDates) {
+            const rev = wwByDate.has(date) ? wwByDate.get(date)! : (byDateMap.get(date) ?? 0);
+            const existing = revByDate.get(date) ?? { ios: 0, android: 0 };
+            existing[storeKey] = rev;
+            revByDate.set(date, existing);
+          }
+          // MTR from last date (prefer WW)
+          const allDates = [...mergedDates].sort();
+          if (allDates.length > 0) {
+            const lastDate = allDates[allDates.length - 1];
+            const lastRev = wwByDate.get(lastDate) ?? byDateMap.get(lastDate) ?? 0;
             if (lastRev > 0) mtrByStore[store] = lastRev;
           }
-          if (filtered.length >= 4) {
+          if (allDates.length >= 4) {
             const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
-            const revs = filtered.map((p: { revenue?: number }) => p.revenue || 0);
+            const revs = allDates.map(d => wwByDate.get(d) ?? byDateMap.get(d) ?? 0);
             const recent = avg(revs.slice(-3));
             const prior = avg(revs.slice(-6, -3));
             const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
