@@ -26,31 +26,25 @@ PORT = 7337
 CLAUDE_APP = "Claude"
 
 
-def click_home_tab() -> None:
-    """Click the Home tab in Claude Desktop using CoreGraphics (bypasses AppleScript UI tree)."""
-    # Get window position via AppleScript, then click Home tab via Python/Quartz
-    result = subprocess.run(
-        ["osascript", "-e",
-         f'tell application "System Events" to tell process "{CLAUDE_APP}" to get position of window 1'],
-        capture_output=True, text=True
-    )
-    pos = result.stdout.strip().split(", ")
-    if len(pos) == 2:
-        try:
-            win_x, win_y = int(pos[0]), int(pos[1])
-            home_x = win_x + 60
-            home_y = win_y + 68
-            script = f"""
-import Quartz, time
-pt = ({home_x}, {home_y})
-for etype in (Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp):
-    e = Quartz.CGEventCreateMouseEvent(None, etype, pt, Quartz.kCGMouseButtonLeft)
-    Quartz.CGEventPost(Quartz.kCGHIDEventTap, e)
-    time.sleep(0.05)
+def open_new_home_chat() -> None:
+    """Open a new Home chat in Claude Desktop via the File menu (not Cmd+N which respects active tab)."""
+    # Clicking the menu item directly always triggers the Home "New Conversation" action
+    # regardless of whether Code tab is currently active
+    script = f"""
+tell application "System Events"
+    tell process "{CLAUDE_APP}"
+        click menu item "New Conversation" of menu "File" of menu bar 1
+    end tell
+end tell
 """
-            subprocess.run(["python3", "-c", script], check=True)
-        except Exception:
-            pass
+    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    if result.returncode != 0:
+        # Fallback: use keyboard shortcut (works when Home tab is already active)
+        subprocess.run(["osascript", "-e",
+            f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "n" using command down'],
+            capture_output=True)
+    import time as _time
+    _time.sleep(1.2)
 
 
 def paste_prompt_to_claude(prompt: str) -> None:
@@ -62,18 +56,15 @@ def paste_prompt_to_claude(prompt: str) -> None:
 
     safe_tmp = tmp_path.replace("\\", "\\\\").replace('"', '\\"')
 
-    # Activate Claude and click Home tab
+    # Activate Claude, then open new Home chat via File menu
     subprocess.run(["osascript", "-e", f'tell application "{CLAUDE_APP}" to activate'])
     import time as _time
     _time.sleep(0.5)
-    click_home_tab()
-    _time.sleep(0.4)
+    open_new_home_chat()
 
     script = f"""
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        keystroke "n" using command down
-        delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.3
         keystroke "v" using command down
@@ -158,14 +149,11 @@ def trigger_claude(data: dict) -> None:
     subprocess.run(["osascript", "-e", f'tell application "{CLAUDE_APP}" to activate'])
     import time as _time
     _time.sleep(0.5)
-    click_home_tab()
-    _time.sleep(0.4)
+    open_new_home_chat()
 
     script = f"""
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        keystroke "n" using command down
-        delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.3
         keystroke "v" using command down{img_block}
@@ -174,7 +162,6 @@ tell application "System Events"
     end tell
 end tell
 
-tell application (prevApp) to activate
 do shell script "rm -f " & quoted form of "{safe_tmp}"
 """
     try:
