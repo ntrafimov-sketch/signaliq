@@ -43,7 +43,20 @@ end tell
 delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        do shell script "open 'claude://new'"
+        try
+            click radio button "Home" of window 1
+        end try
+        try
+            click radio button 1 of radio group 1 of window 1
+        end try
+        try
+            click radio button "Home" of radio group 1 of window 1
+        end try
+        try
+            click radio button "Home" of group 1 of window 1
+        end try
+        delay 0.4
+        keystroke "n" using command down
         delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.3
@@ -136,7 +149,20 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        do shell script "open 'claude://new'"
+        try
+            click radio button "Home" of window 1
+        end try
+        try
+            click radio button 1 of radio group 1 of window 1
+        end try
+        try
+            click radio button "Home" of radio group 1 of window 1
+        end try
+        try
+            click radio button "Home" of group 1 of window 1
+        end try
+        delay 0.4
+        keystroke "n" using command down
         delay 1.5
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
         delay 0.3
