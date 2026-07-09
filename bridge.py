@@ -69,8 +69,8 @@ def open_new_home_chat() -> None:
 tell application "System Events"
     tell process "{CLAUDE_APP}"
         set winPos to position of window 1
-        set homeX to (item 1 of winPos) + 20
-        set homeY to (item 2 of winPos) + 45
+        set homeX to (item 1 of winPos) + 99
+        set homeY to (item 2 of winPos) + 307
         click at {{homeX, homeY}}
         delay 0.4
         keystroke "n" using command down
