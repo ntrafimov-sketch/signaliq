@@ -43,7 +43,7 @@ end tell
 delay 0.5
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        click group 1 of group 1 of group 1 of group 1 of group 1 of window 1
+        click group 2 of group 1 of group 1 of group 1 of group 1 of window 1
         delay 0.4
         keystroke "n" using command down
         delay 1.5
@@ -138,7 +138,7 @@ delay 0.5
 
 tell application "System Events"
     tell process "{CLAUDE_APP}"
-        click group 1 of group 1 of group 1 of group 1 of group 1 of window 1
+        click group 2 of group 1 of group 1 of group 1 of group 1 of window 1
         delay 0.4
         keystroke "n" using command down
         delay 1.5
