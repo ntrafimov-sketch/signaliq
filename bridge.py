@@ -29,12 +29,13 @@ CLAUDE_APP = "Claude"
 def open_new_home_chat() -> None:
     """Open a new Home chat in Claude Desktop."""
     import time as _time
-    # Step 1: switch to Home tab via Cmd+1 (standard Electron first-tab shortcut)
+    # Press Ctrl+Tab to cycle to Home tab if Code is currently active
+    # (Electron apps use Ctrl+Tab for tab cycling)
     subprocess.run(["osascript", "-e",
-        f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "1" using command down'],
+        f'tell application "System Events" to tell process "{CLAUDE_APP}" to key code 48 using control down'],
         capture_output=True)
-    _time.sleep(0.4)
-    # Step 2: open new chat (now that Home tab is active, Cmd+N opens a Home chat)
+    _time.sleep(0.3)
+    # Open new chat
     subprocess.run(["osascript", "-e",
         f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "n" using command down'],
         capture_output=True)
@@ -251,6 +252,13 @@ if __name__ == "__main__":
         )
         if r.stdout.strip():
             print(f"  Claude File menu items: {r.stdout.strip()}")
+        r2 = subprocess.run(
+            ["osascript", "-e",
+             f'tell application "System Events" to tell process "{CLAUDE_APP}" to get name of every menu item of menu "Window" of menu bar 1'],
+            capture_output=True, text=True, timeout=5
+        )
+        if r2.stdout.strip():
+            print(f"  Claude Window menu items: {r2.stdout.strip()}")
     except Exception:
         pass
 
