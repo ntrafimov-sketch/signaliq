@@ -63,21 +63,48 @@ end tell
 
 
 def open_new_home_chat() -> None:
-    """Click the Home tab then open a new chat."""
+    """Click the Home tab via Quartz (low-level, bypasses Electron focus issues) then open new chat."""
     import time as _time
-    script = f"""
-tell application "System Events"
-    tell process "{CLAUDE_APP}"
-        set winPos to position of window 1
-        set homeX to (item 1 of winPos) + 99
-        set homeY to (item 2 of winPos) + 307
-        click at {{homeX, homeY}}
-        delay 0.4
-        keystroke "n" using command down
-    end tell
-end tell
+
+    # Get window position to compute absolute Home tab coordinates
+    r = subprocess.run(
+        ["osascript", "-e",
+         f'tell application "System Events" to tell process "{CLAUDE_APP}" to get position of window 1'],
+        capture_output=True, text=True
+    )
+    pos = r.stdout.strip().split(", ")
+
+    # Get screen height for AppKit Y-flip (Quartz uses bottom-left origin)
+    sh = subprocess.run(
+        ["osascript", "-l", "JavaScript", "-e",
+         "ObjC.import('AppKit'); $.NSScreen.mainScreen.frame.size.height + ''"],
+        capture_output=True, text=True
+    )
+    try:
+        screen_h = float(sh.stdout.strip())
+        win_x = int(pos[0])
+        win_y = int(pos[1])
+        # Offset calibrated from get_coords.py: x+99, y+307
+        home_x = win_x + 99
+        home_y = win_y + 307
+        # Convert AppleScript (top-left) → Quartz/AppKit (bottom-left)
+        quartz_y = screen_h - home_y
+        script = f"""
+import Quartz, time
+pt = ({home_x}, {quartz_y})
+for etype in (Quartz.kCGEventLeftMouseDown, Quartz.kCGEventLeftMouseUp):
+    e = Quartz.CGEventCreateMouseEvent(None, etype, pt, Quartz.kCGMouseButtonLeft)
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap, e)
+    time.sleep(0.05)
 """
-    subprocess.run(["osascript", "-e", script], capture_output=True)
+        subprocess.run(["python3", "-c", script], check=True)
+    except Exception:
+        pass
+
+    _time.sleep(0.4)
+    subprocess.run(["osascript", "-e",
+        f'tell application "System Events" to tell process "{CLAUDE_APP}" to keystroke "n" using command down'],
+        capture_output=True)
     _time.sleep(1.2)
 
 
