@@ -366,7 +366,12 @@ export function AccountsPage() {
       // Dedup by both ID and domain to prevent duplicates when multiple users sync
       const serverIds = new Set((serverAccounts as Account[]).map(a => a.id));
       const serverDomains = new Set((serverAccounts as Account[]).map(a => a.domain).filter(Boolean));
-      const localOnly = localAccounts.filter(a => !serverIds.has(a.id) && !serverDomains.has(a.domain));
+      const serverNames = new Set((serverAccounts as Account[]).map(a => a.company_name.toLowerCase().trim()));
+      const localOnly = localAccounts.filter(a =>
+        !serverIds.has(a.id) &&
+        !serverDomains.has(a.domain) &&
+        !serverNames.has(a.company_name.toLowerCase().trim())
+      );
       // Merge local-only accounts into the server list
       const merged = [...(serverAccounts as Account[]), ...localOnly];
       setAccounts(merged);
@@ -480,7 +485,7 @@ export function AccountsPage() {
 
   // Dedup by domain (keep the one with more data — higher score or more signals)
   const deduped = accounts.reduce((acc, a) => {
-    const key = a.domain || a.id;
+    const key = a.domain || a.company_name.toLowerCase().trim() || a.id;
     const existing = acc.get(key);
     if (!existing || (a.score > existing.score) || (a.signals.length > existing.signals.length)) {
       acc.set(key, a);
