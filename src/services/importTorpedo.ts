@@ -245,15 +245,24 @@ export function importTorpedoJson(
         break;
       }
 
+      case 'sdk_scan':
+      case 'app_sdks':
       case 'sdks': {
         const PAYWALL = ['revenuecat', 'superwall', 'purchasely', 'qonversion', 'apphud'];
         const LIFECYCLE = ['braze', 'customer.io', 'customerio', 'clevertap', 'leanplum', 'intercom'];
-        const sdkList: { name: string }[] = Array.isArray(entry.data)
-          ? entry.data
-          : [
-              ...((entry.data.ios || []) as { name: string }[]),
-              ...((entry.data.android || []) as { name: string }[]),
-            ].filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i);
+        // Normalize: handle string[], {name}[], {ios:[],android:[]}, or plain object
+        const toNameObjs = (arr: unknown[]): { name: string }[] =>
+          arr.map(s => typeof s === 'string' ? { name: s } : (s as { name: string }));
+        let rawList: unknown[];
+        if (Array.isArray(entry.data)) {
+          rawList = entry.data;
+        } else {
+          const d = entry.data as Record<string, unknown[]>;
+          rawList = [...(d.ios || []), ...(d.android || [])];
+        }
+        const sdkList = toNameObjs(rawList).filter((s, i, arr) =>
+          s.name && arr.findIndex(x => x.name === s.name) === i
+        );
         const paywall = sdkList.filter(s => s.name && PAYWALL.some(p => s.name.toLowerCase().includes(p)));
         const lifecycle = sdkList.filter(s => s.name && LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
         if (paywall.length) hasPaywall = true;
