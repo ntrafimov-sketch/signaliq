@@ -512,8 +512,9 @@ export function AccountsPage() {
 
 
   // Dedup by domain (keep the one with more data — higher score or more signals)
+  const normDomain = (d: string) => (d || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
   const deduped = accounts.reduce((acc, a) => {
-    const key = a.domain || a.company_name.toLowerCase().trim() || a.id;
+    const key = normDomain(a.domain) || a.company_name.toLowerCase().trim() || a.id;
     const existing = acc.get(key);
     if (!existing || (a.score > existing.score) || (a.signals.length > existing.signals.length)) {
       acc.set(key, a);
