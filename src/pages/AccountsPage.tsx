@@ -372,8 +372,17 @@ export function AccountsPage() {
         !serverDomains.has(a.domain) &&
         !serverNames.has(a.company_name.toLowerCase().trim())
       );
+      // Prefer local enrichmentStatus if it's 'done' but server still has 'enriching'
+      const localById = new Map(localAccounts.map(a => [a.id, a]));
+      const serverMerged = (serverAccounts as Account[]).map(a => {
+        const local = localById.get(a.id);
+        if (local && local.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching') {
+          return { ...a, enrichmentStatus: 'done' as const };
+        }
+        return a;
+      });
       // Merge local-only accounts into the server list
-      const merged = [...(serverAccounts as Account[]), ...localOnly];
+      const merged = [...serverMerged, ...localOnly];
       setAccounts(merged);
       // Re-upload any local-only accounts so server stays in sync
       if (localOnly.length > 0 && t) {
@@ -681,7 +690,7 @@ export function AccountsPage() {
                         <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
                         <span className="text-xs font-semibold">Researching…</span>
                         <button
-                          onClick={e => { e.preventDefault(); e.stopPropagation(); updateAccount(account.id, { enrichmentStatus: 'done' }); }}
+                          onClick={e => { e.preventDefault(); e.stopPropagation(); updateAccount(account.id, { enrichmentStatus: 'done' }); syncAccount({ ...account, enrichmentStatus: 'done' }, token); }}
                           className="hidden group-hover:block text-xs text-gray-400 hover:text-gray-600 ml-1"
                           title="Mark as done"
                         >✕</button>
