@@ -461,6 +461,14 @@ export function AccountsPage() {
             departmentIntel: updates.departmentIntel,
             torpedoData: updates.torpedoData,
           };
+          // Remove any stale enriching placeholder for this company
+          const stale = current.find(a =>
+            a.enrichmentStatus === 'enriching' && (
+              (a.company_name || '').toLowerCase().trim() === (companyName || '').toLowerCase().trim() ||
+              normalizeDomain(a.domain) === normalizeDomain(accountId)
+            ) && a.id !== baseId
+          );
+          if (stale) useStore.getState().removeAccount(stale.id);
           console.log('[webhook] creating new account', newAccount.company_name, newAccount.id);
           addAccounts([newAccount]);
           syncAccount(newAccount, useAuthStore.getState().token);
@@ -669,9 +677,14 @@ export function AccountsPage() {
                   </td>
                   <td className="px-4 py-3">
                     {account.enrichmentStatus === 'enriching' ? (
-                      <div className="flex items-center gap-2 text-violet-600">
+                      <div className="flex items-center gap-2 text-violet-600 group">
                         <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
                         <span className="text-xs font-semibold">Researching…</span>
+                        <button
+                          onClick={e => { e.preventDefault(); e.stopPropagation(); updateAccount(account.id, { enrichmentStatus: 'done' }); }}
+                          className="hidden group-hover:block text-xs text-gray-400 hover:text-gray-600 ml-1"
+                          title="Mark as done"
+                        >✕</button>
                       </div>
                     ) : (
                       <ScoreRing score={account.score} tier={account.scoreLabel} />
