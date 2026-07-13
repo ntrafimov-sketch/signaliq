@@ -15,6 +15,7 @@ const BACKEND = import.meta.env.VITE_BACKEND_URL || '';
 
 async function syncAccount(account: Account, token: string | null) {
   if (!token) return;
+  if (account.enrichmentStatus === 'enriching') return; // never persist placeholders
   try {
     await fetch(`${BACKEND}/api/accounts`, {
       method: 'POST',

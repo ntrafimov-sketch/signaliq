@@ -58,7 +58,11 @@ function saveData() {
 }
 
 const db: ServerData = loadData();
-console.log(`[server] loaded ${db.users.length} users, ${db.accounts.length} accounts from disk`);
+// Remove any stale enriching placeholders that should never have been persisted
+const beforeClean = db.accounts.length;
+db.accounts = (db.accounts as any[]).filter((a: any) => a.enrichmentStatus !== 'enriching');
+if (db.accounts.length !== beforeClean) saveData();
+console.log(`[server] loaded ${db.users.length} users, ${db.accounts.length} accounts from disk (cleaned ${beforeClean - db.accounts.length} enriching placeholders)`);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 
@@ -151,6 +155,7 @@ app.get('/api/accounts', requireAuth, (_req, res) => {
 
 app.post('/api/accounts', requireAuth, (req, res) => {
   const account = req.body;
+  if (account.enrichmentStatus === 'enriching') { res.json({ ok: true, skipped: true }); return; }
   const existing = (db.accounts as any[]).findIndex((a: any) => a.id === account.id);
   if (existing >= 0) {
     (db.accounts as any[])[existing] = account;
