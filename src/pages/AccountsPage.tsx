@@ -374,13 +374,23 @@ export function AccountsPage() {
       );
       // Prefer local enrichmentStatus if it's 'done' but server still has 'enriching'
       const localById = new Map(localAccounts.map(a => [a.id, a]));
-      const serverMerged = (serverAccounts as Account[]).map(a => {
-        const local = localById.get(a.id);
-        if (local && local.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching') {
-          return { ...a, enrichmentStatus: 'done' as const };
-        }
-        return a;
-      });
+      const localDomains = new Set(localAccounts.map(a => (a.domain || '').toLowerCase()));
+      const localNames = new Set(localAccounts.map(a => a.company_name.toLowerCase().trim()));
+      const serverMerged = (serverAccounts as Account[])
+        // Drop server-side enriching accounts that don't exist locally (user deleted them)
+        .filter(a => {
+          if (a.enrichmentStatus !== 'enriching') return true;
+          return localById.has(a.id) ||
+            localDomains.has((a.domain || '').toLowerCase()) ||
+            localNames.has(a.company_name.toLowerCase().trim());
+        })
+        .map(a => {
+          const local = localById.get(a.id);
+          if (local && local.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching') {
+            return { ...a, enrichmentStatus: 'done' as const };
+          }
+          return a;
+        });
       // Merge local-only accounts into the server list
       const merged = [...serverMerged, ...localOnly];
       setAccounts(merged);
