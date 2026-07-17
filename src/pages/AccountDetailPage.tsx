@@ -259,10 +259,7 @@ export function AccountDetailPage() {
                 a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
                 a.download = `${account.company_name}-people.csv`;
                 a.click();
-              }}><Download className="w-3.5 h-3.5" />Export</Button>
-              <Button variant="secondary" size="sm" onClick={() => { setShowJsonPaste(true); setJsonPasteError(''); }}>
-                <RefreshCw className="w-3.5 h-3.5" />Paste JSON
-              </Button>
+              }}><Download className="w-3.5 h-3.5" />Export Leads</Button>
             </div>
           </div>
         </div>
