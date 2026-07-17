@@ -238,7 +238,28 @@ export function AccountDetailPage() {
           <div className="flex items-center gap-6 flex-shrink-0">
             <ScoreRingLarge score={account.score} tier={account.scoreLabel} />
             <div className="flex flex-col gap-2">
-              <Button variant="secondary" size="sm"><Download className="w-3.5 h-3.5" />Export</Button>
+              <Button variant="secondary" size="sm" onClick={() => {
+                const people = account.people ?? [];
+                const rows = [
+                  ['Name', 'Title', 'Department', 'Company', 'Influence', 'Email', 'LinkedIn', 'Location', 'Recent Post 1', 'Recent Post 2', 'Recent Post 3'],
+                  ...people.map(p => [
+                    p.name,
+                    p.title,
+                    p.department,
+                    p.company || account.company_name,
+                    p.influence,
+                    p.email || '',
+                    p.linkedin || '',
+                    p.location || '',
+                    ...(p.recentPosts ?? []).slice(0, 3).map(post => `${post.date} — ${post.content}`),
+                  ]),
+                ];
+                const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                a.download = `${account.company_name}-people.csv`;
+                a.click();
+              }}><Download className="w-3.5 h-3.5" />Export</Button>
               <Button variant="secondary" size="sm" onClick={() => { setShowJsonPaste(true); setJsonPasteError(''); }}>
                 <RefreshCw className="w-3.5 h-3.5" />Paste JSON
               </Button>
