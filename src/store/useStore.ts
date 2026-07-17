@@ -106,7 +106,22 @@ export const useStore = create<AppState>()(
     {
       name: 'signaliq-storage',
       partialize: (state) => ({
-        accounts: state.accounts,
+        // Strip heavy fields before persisting to localStorage to avoid quota errors.
+        // torpedoData, revenueHistory, downloadHistory, people, news, paywallScreenshot
+        // are all stored on Railway and reloaded via WebSocket on connect.
+        accounts: state.accounts.map(a => ({
+          ...a,
+          torpedoData: undefined,
+          paywallScreenshot: undefined,
+          revenueHistory: undefined,
+          downloadHistory: undefined,
+          news: undefined,
+          people: undefined,
+          orgChart: undefined,
+          adIntelligence: undefined,
+          departmentIntel: undefined,
+          investmentHistory: undefined,
+        })),
         apiKeys: state.apiKeys,
         profile: state.profile,
         lists: state.lists,
