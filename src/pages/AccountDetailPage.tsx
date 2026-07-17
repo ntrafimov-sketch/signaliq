@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Globe, Download, RefreshCw,
+  ArrowLeft, Globe, Download,
   Calendar, MessageSquare, Briefcase, ChevronDown, ChevronRight, ExternalLink,
   Newspaper, TrendingUp, ImagePlus, Snowflake, Sun, Leaf, Flower2, StickyNote
 } from 'lucide-react';
