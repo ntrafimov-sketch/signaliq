@@ -49,12 +49,18 @@ function loadData(): ServerData {
   return { users: [], accounts: [] };
 }
 
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function saveData() {
-  try {
-    writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf-8');
-  } catch (e) {
-    console.error('[server] failed to save data:', e);
-  }
+  // Debounce: batch writes within 2s to avoid blocking on every request
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      writeFileSync(DATA_FILE, JSON.stringify(db), 'utf-8');
+    } catch (e) {
+      console.error('[server] failed to save data:', e);
+    }
+  }, 2000);
 }
 
 const db: ServerData = loadData();
@@ -209,10 +215,11 @@ app.post('/api/enrich', (req, res) => {
   }
 
   if (!data) { res.status(400).json({ error: 'data is required' }); return; }
-  console.log('[enrich] account_id:', account_id, 'company_name:', company_name, 'data type:', Array.isArray(data) ? `array[${(data as unknown[]).length}]` : typeof data);
 
-  broadcast('enrich', { account_id, company_name, data });
-  res.json({ ok: true, pushed_to: clients.size });
+  // Respond immediately so Clay doesn't timeout, then broadcast
+  res.json({ ok: true });
+  console.log('[enrich] account_id:', account_id, 'company_name:', company_name);
+  setImmediate(() => broadcast('enrich', { account_id, company_name, data }));
 });
 
 app.post('/api/sequence-result', (req, res) => {
