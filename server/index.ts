@@ -192,14 +192,22 @@ app.post('/api/enrich', (req, res) => {
     const rawData = body.data;
     if (typeof rawData === 'string') {
       try { data = JSON.parse(rawData); } catch { data = []; }
-    } else {
+    } else if (Array.isArray(rawData)) {
       data = rawData;
+    } else if (rawData && typeof rawData === 'object') {
+      data = rawData;
+    } else {
+      // Clay may send flat fields without a `data` wrapper — wrap into company_intel
+      const { account_id: _aid, company_name: _cn, ...rest } = body as Record<string, unknown>;
+      void _aid; void _cn;
+      data = [{ type: 'company_intel', data: rest }];
     }
-    account_id = body.account_id || body.domain || `account-${Date.now()}`;
-    company_name = body.company_name || body.name || 'Unknown';
+    account_id = body.account_id || body.domain || (body as any).Domain || `account-${Date.now()}`;
+    company_name = body.company_name || body.name || (body as any).Name || 'Unknown';
   }
 
   if (!data) { res.status(400).json({ error: 'data is required' }); return; }
+  console.log('[enrich] account_id:', account_id, 'company_name:', company_name, 'data type:', Array.isArray(data) ? `array[${(data as unknown[]).length}]` : typeof data);
 
   broadcast('enrich', { account_id, company_name, data });
   res.json({ ok: true, pushed_to: clients.size });
