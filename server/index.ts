@@ -186,7 +186,9 @@ app.post('/api/enrich', (req, res) => {
   if (Array.isArray(body)) {
     data = body;
     const intel = body.find((e: { type?: string }) => e.type === 'company_intel') as { data?: { domain?: string; name?: string } } | undefined;
-    account_id = intel?.data?.domain || `account-${Date.now()}`;
+    // domain may be "kicker.de / olympia-verlag.de" — take first value only
+    const rawDomain = intel?.data?.domain || '';
+    account_id = rawDomain.split(/[\s,/|]+/).map((s: string) => s.trim()).filter(Boolean)[0] || `account-${Date.now()}`;
     company_name = intel?.data?.name || 'Unknown';
   } else {
     const rawData = body.data;
