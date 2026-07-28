@@ -159,8 +159,17 @@ app.get('/api/accounts', requireAuth, (_req, res) => {
   res.json(db.accounts);
 });
 
+// Strip large fields before storing — keeps server memory and data.json lean
+function stripHeavy(account: any) {
+  const { torpedoData, paywallScreenshot, revenueHistory, downloadHistory,
+          people, news, adIntelligence, orgChart, investmentHistory, departmentIntel, ...rest } = account;
+  void torpedoData; void paywallScreenshot; void revenueHistory; void downloadHistory;
+  void people; void news; void adIntelligence; void orgChart; void investmentHistory; void departmentIntel;
+  return rest;
+}
+
 app.post('/api/accounts', requireAuth, (req, res) => {
-  const account = req.body;
+  const account = stripHeavy(req.body);
   if (account.enrichmentStatus === 'enriching') { res.json({ ok: true, skipped: true }); return; }
   const existing = (db.accounts as any[]).findIndex((a: any) => a.id === account.id);
   if (existing >= 0) {
