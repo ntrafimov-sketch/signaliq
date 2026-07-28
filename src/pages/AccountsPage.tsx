@@ -396,6 +396,8 @@ export function AccountsPage() {
           if (local.orgChart) restored.orgChart = local.orgChart;
           if (local.investmentHistory?.length) restored.investmentHistory = local.investmentHistory;
           if (local.departmentIntel) restored.departmentIntel = local.departmentIntel;
+          if (local.revenueHistory?.length) restored.revenueHistory = local.revenueHistory;
+          if (local.downloadHistory?.length) restored.downloadHistory = local.downloadHistory;
           if (local.paywallAnalysis) restored.paywallAnalysis = local.paywallAnalysis;
           if (local.opportunitySummary) restored.opportunitySummary = local.opportunitySummary;
           if (local.whyMatters) restored.whyMatters = local.whyMatters;
