@@ -49,14 +49,24 @@ function loadData(): ServerData {
   return { users: [], accounts: [] };
 }
 
+// torpedoData / paywallScreenshot are huge raw blobs — strip before disk write to prevent OOM.
+// All other enriched fields (people, news, adIntelligence, …) stay in memory so clients
+// receive them via WebSocket and can cache them in localStorage.
+function stripForDisk(a: any) {
+  if (!a || typeof a !== 'object') return a;
+  const { torpedoData, paywallScreenshot, revenueHistory, downloadHistory, ...rest } = a;
+  void torpedoData; void paywallScreenshot; void revenueHistory; void downloadHistory;
+  return rest;
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function saveData() {
-  // Debounce: batch writes within 2s to avoid blocking on every request
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
     try {
-      writeFileSync(DATA_FILE, JSON.stringify(db), 'utf-8');
+      const toSave = { users: db.users, accounts: (db.accounts as any[]).map(stripForDisk) };
+      writeFileSync(DATA_FILE, JSON.stringify(toSave), 'utf-8');
     } catch (e) {
       console.error('[server] failed to save data:', e);
     }

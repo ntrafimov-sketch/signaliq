@@ -387,10 +387,22 @@ export function AccountsPage() {
         })
         .map(a => {
           const local = localById.get(a.id);
-          if (local && local.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching') {
-            return { ...a, enrichmentStatus: 'done' as const };
-          }
-          return a;
+          if (!local) return a;
+          // Server strips large raw fields — restore enriched data from localStorage
+          const restored: Partial<Account> = {};
+          if (local.people?.length) restored.people = local.people;
+          if (local.news?.length) restored.news = local.news;
+          if (local.adIntelligence) restored.adIntelligence = local.adIntelligence;
+          if (local.orgChart) restored.orgChart = local.orgChart;
+          if (local.investmentHistory?.length) restored.investmentHistory = local.investmentHistory;
+          if (local.departmentIntel) restored.departmentIntel = local.departmentIntel;
+          if (local.paywallAnalysis) restored.paywallAnalysis = local.paywallAnalysis;
+          if (local.opportunitySummary) restored.opportunitySummary = local.opportunitySummary;
+          if (local.whyMatters) restored.whyMatters = local.whyMatters;
+          if (local.products?.length) restored.products = local.products;
+          const enrichmentStatus = (local.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching')
+            ? 'done' as const : a.enrichmentStatus;
+          return { ...a, ...restored, enrichmentStatus };
         });
       // Merge local-only accounts into the server list
       const merged = [...serverMerged, ...localOnly];

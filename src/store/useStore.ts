@@ -111,16 +111,11 @@ export const useStore = create<AppState>()(
         // are all stored on Railway and reloaded via WebSocket on connect.
         accounts: state.accounts.map(a => ({
           ...a,
+          // Strip only truly large raw fields; keep enriched data so it survives page refresh
           torpedoData: undefined,
           paywallScreenshot: undefined,
           revenueHistory: undefined,
           downloadHistory: undefined,
-          news: undefined,
-          people: undefined,
-          orgChart: undefined,
-          adIntelligence: undefined,
-          departmentIntel: undefined,
-          investmentHistory: undefined,
         })),
         apiKeys: state.apiKeys,
         profile: state.profile,
