@@ -387,26 +387,10 @@ export function AccountsPage() {
         })
         .map(a => {
           const local = localById.get(a.id);
-          if (!local) return a;
-          // Restore heavy fields that server strips — server is source of truth for metadata,
-          // but local is source of truth for enriched data (people, news, adIntelligence, etc.)
-          const heavy: Partial<Account> = {};
-          if (local.people?.length) heavy.people = local.people;
-          if (local.news?.length) heavy.news = local.news;
-          if (local.adIntelligence) heavy.adIntelligence = local.adIntelligence;
-          if (local.orgChart) heavy.orgChart = local.orgChart;
-          if (local.investmentHistory?.length) heavy.investmentHistory = local.investmentHistory;
-          if (local.departmentIntel) heavy.departmentIntel = local.departmentIntel;
-          if (local.revenueHistory?.length) heavy.revenueHistory = local.revenueHistory;
-          if (local.downloadHistory?.length) heavy.downloadHistory = local.downloadHistory;
-          if (local.torpedoData?.length) heavy.torpedoData = local.torpedoData;
-          if (local.paywallAnalysis) heavy.paywallAnalysis = local.paywallAnalysis;
-          if (local.opportunitySummary) heavy.opportunitySummary = local.opportunitySummary;
-          if (local.whyMatters) heavy.whyMatters = local.whyMatters;
-          if (local.products?.length) heavy.products = local.products;
-          const enrichmentStatus = (local.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching')
-            ? 'done' as const : a.enrichmentStatus;
-          return { ...a, ...heavy, enrichmentStatus };
+          if (local && local.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching') {
+            return { ...a, enrichmentStatus: 'done' as const };
+          }
+          return a;
         });
       // Merge local-only accounts into the server list
       const merged = [...serverMerged, ...localOnly];

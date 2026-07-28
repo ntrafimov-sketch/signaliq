@@ -49,13 +49,6 @@ function loadData(): ServerData {
   return { users: [], accounts: [] };
 }
 
-// Strip only raw/huge fields before disk write; processed fields stay in memory for broadcast.
-function stripForDisk(account: any) {
-  const { torpedoData, paywallScreenshot, revenueHistory, downloadHistory, ...rest } = account;
-  void torpedoData; void paywallScreenshot; void revenueHistory; void downloadHistory;
-  return rest;
-}
-
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function saveData() {
   // Debounce: batch writes within 2s to avoid blocking on every request
@@ -63,8 +56,7 @@ function saveData() {
   saveTimer = setTimeout(() => {
     saveTimer = null;
     try {
-      const toSave = { users: db.users, accounts: (db.accounts as any[]).map(stripForDisk) };
-      writeFileSync(DATA_FILE, JSON.stringify(toSave), 'utf-8');
+      writeFileSync(DATA_FILE, JSON.stringify(db), 'utf-8');
     } catch (e) {
       console.error('[server] failed to save data:', e);
     }
