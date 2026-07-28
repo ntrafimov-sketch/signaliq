@@ -49,16 +49,12 @@ function loadData(): ServerData {
   return { users: [], accounts: [] };
 }
 
-// Server stores only lightweight metadata — enriched fields live in client localStorage.
-// This prevents OOM in JSON.stringify (broadcast + disk write) with 100+ accounts.
+// Strip only torpedoData (raw input JSON, ~200KB per account) and paywallScreenshot (binary).
+// Everything else — people, news, adIntelligence, revenueHistory — is small and stays on server.
 function stripHeavy(a: any) {
   if (!a || typeof a !== 'object') return a;
-  const { torpedoData, paywallScreenshot, revenueHistory, downloadHistory,
-          people, news, adIntelligence, orgChart, investmentHistory,
-          departmentIntel, paywallAnalysis, jobOpenings, products, emailCollection, ...rest } = a;
-  void torpedoData; void paywallScreenshot; void revenueHistory; void downloadHistory;
-  void people; void news; void adIntelligence; void orgChart; void investmentHistory;
-  void departmentIntel; void paywallAnalysis; void jobOpenings; void products; void emailCollection;
+  const { torpedoData, paywallScreenshot, ...rest } = a;
+  void torpedoData; void paywallScreenshot;
   return rest;
 }
 
