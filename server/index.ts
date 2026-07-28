@@ -49,13 +49,16 @@ function loadData(): ServerData {
   return { users: [], accounts: [] };
 }
 
-// torpedoData / paywallScreenshot are huge raw blobs — strip before disk write to prevent OOM.
-// All other enriched fields (people, news, adIntelligence, …) stay in memory so clients
-// receive them via WebSocket and can cache them in localStorage.
-function stripForDisk(a: any) {
+// Server stores only lightweight metadata — enriched fields live in client localStorage.
+// This prevents OOM in JSON.stringify (broadcast + disk write) with 100+ accounts.
+function stripHeavy(a: any) {
   if (!a || typeof a !== 'object') return a;
-  const { torpedoData, paywallScreenshot, revenueHistory, downloadHistory, ...rest } = a;
+  const { torpedoData, paywallScreenshot, revenueHistory, downloadHistory,
+          people, news, adIntelligence, orgChart, investmentHistory,
+          departmentIntel, paywallAnalysis, jobOpenings, products, emailCollection, ...rest } = a;
   void torpedoData; void paywallScreenshot; void revenueHistory; void downloadHistory;
+  void people; void news; void adIntelligence; void orgChart; void investmentHistory;
+  void departmentIntel; void paywallAnalysis; void jobOpenings; void products; void emailCollection;
   return rest;
 }
 
@@ -65,7 +68,7 @@ function saveData() {
   saveTimer = setTimeout(() => {
     saveTimer = null;
     try {
-      const toSave = { users: db.users, accounts: (db.accounts as any[]).map(stripForDisk) };
+      const toSave = { users: db.users, accounts: (db.accounts as any[]).map(stripHeavy) };
       writeFileSync(DATA_FILE, JSON.stringify(toSave), 'utf-8');
     } catch (e) {
       console.error('[server] failed to save data:', e);
@@ -170,7 +173,7 @@ app.get('/api/accounts', requireAuth, (_req, res) => {
 });
 
 app.post('/api/accounts', requireAuth, (req, res) => {
-  const account = req.body;
+  const account = stripHeavy(req.body);
   if (account.enrichmentStatus === 'enriching') { res.json({ ok: true, skipped: true }); return; }
   const existing = (db.accounts as any[]).findIndex((a: any) => a.id === account.id);
   if (existing >= 0) {
