@@ -49,6 +49,13 @@ function loadData(): ServerData {
   return { users: [], accounts: [] };
 }
 
+// Strip only raw/huge fields before disk write; processed fields stay in memory for broadcast.
+function stripForDisk(account: any) {
+  const { torpedoData, paywallScreenshot, revenueHistory, downloadHistory, ...rest } = account;
+  void torpedoData; void paywallScreenshot; void revenueHistory; void downloadHistory;
+  return rest;
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function saveData() {
   // Debounce: batch writes within 2s to avoid blocking on every request
@@ -56,7 +63,8 @@ function saveData() {
   saveTimer = setTimeout(() => {
     saveTimer = null;
     try {
-      writeFileSync(DATA_FILE, JSON.stringify(db), 'utf-8');
+      const toSave = { users: db.users, accounts: (db.accounts as any[]).map(stripForDisk) };
+      writeFileSync(DATA_FILE, JSON.stringify(toSave), 'utf-8');
     } catch (e) {
       console.error('[server] failed to save data:', e);
     }
@@ -159,17 +167,8 @@ app.get('/api/accounts', requireAuth, (_req, res) => {
   res.json(db.accounts);
 });
 
-// Strip large fields before storing — keeps server memory and data.json lean
-function stripHeavy(account: any) {
-  const { torpedoData, paywallScreenshot, revenueHistory, downloadHistory,
-          people, news, adIntelligence, orgChart, investmentHistory, departmentIntel, ...rest } = account;
-  void torpedoData; void paywallScreenshot; void revenueHistory; void downloadHistory;
-  void people; void news; void adIntelligence; void orgChart; void investmentHistory; void departmentIntel;
-  return rest;
-}
-
 app.post('/api/accounts', requireAuth, (req, res) => {
-  const account = stripHeavy(req.body);
+  const account = req.body;
   if (account.enrichmentStatus === 'enriching') { res.json({ ok: true, skipped: true }); return; }
   const existing = (db.accounts as any[]).findIndex((a: any) => a.id === account.id);
   if (existing >= 0) {
