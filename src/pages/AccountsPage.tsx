@@ -633,6 +633,38 @@ export function AccountsPage() {
         </div>
       )}
 
+      {/* Selection bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-violet-50 border border-violet-200 rounded-xl">
+          <span className="text-sm font-semibold text-violet-700">{selectedIds.size} selected</span>
+          <button
+            onClick={() => {
+              const selected = filtered.filter(a => selectedIds.has(a.id));
+              const headers = ['Company', 'Domain', 'Score', 'People', 'Locations', 'Active Outreach', 'Added'];
+              const rows = selected.map(a => [
+                a.company_name,
+                a.domain,
+                a.score,
+                a.employees || a.people?.length || '',
+                [...new Set((a.people || []).map(p => p.location).filter(Boolean))].join('; '),
+                a.activeOutreach ? 'Yes' : 'No',
+                a.addedAt ? new Date(a.addedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : a.lastUpdated,
+              ]);
+              const csv = [headers, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+              const el = document.createElement('a');
+              el.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+              el.download = `companies-${new Date().toISOString().slice(0, 10)}.csv`;
+              el.click();
+            }}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export CSV
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-xs text-violet-500 hover:text-violet-700 ml-auto">Clear</button>
+        </div>
+      )}
+
       {/* Table */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-violet-100 shadow-sm shadow-violet-50 flex flex-col items-center justify-center py-20 gap-3">
