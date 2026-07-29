@@ -60,6 +60,7 @@ export interface Account {
   addedAt?: string;
   addedBy?: string;
   notes?: string;
+  activeOutreach?: boolean;
   description: string;
   founded: string;
   hq: string;

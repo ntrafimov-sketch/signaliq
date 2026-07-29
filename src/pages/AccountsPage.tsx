@@ -673,6 +673,12 @@ export function AccountsPage() {
                     People <SortIcon field="employees" />
                   </button>
                 </th>
+                <th className="px-4 py-3 text-left hidden xl:table-cell">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Locations</span>
+                </th>
+                <th className="px-4 py-3 text-left hidden md:table-cell">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Active Outreach</span>
+                </th>
                 <th className="px-4 py-3 text-left hidden sm:table-cell">
                   <button onClick={() => handleSort('lastUpdated')} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700">
                     Added <SortIcon field="lastUpdated" />
@@ -730,6 +736,33 @@ export function AccountsPage() {
                       <Users className="w-3.5 h-3.5 text-gray-400" />
                       {(() => { const h = getHeadcount(account); return <span>{h > 0 ? h.toLocaleString() : '—'}</span>; })()}
                     </div>
+                  </td>
+                  <td className="px-4 py-3 hidden xl:table-cell">
+                    {(() => {
+                      const locs = [...new Set((account.people || []).map(p => p.location).filter(Boolean))].slice(0, 3);
+                      return locs.length > 0
+                        ? <div className="flex flex-wrap gap-1">{locs.map(l => <span key={l} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{l}</span>)}</div>
+                        : <span className="text-sm text-gray-400">—</span>;
+                    })()}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const updated = { ...account, activeOutreach: !account.activeOutreach };
+                        updateAccount(account.id, { activeOutreach: !account.activeOutreach });
+                        syncAccount(updated, token);
+                      }}
+                      className={cn(
+                        'text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors',
+                        account.activeOutreach
+                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                          : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
+                      )}
+                    >
+                      {account.activeOutreach ? 'Yes' : 'No'}
+                    </button>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <div className="flex flex-col gap-0.5">
