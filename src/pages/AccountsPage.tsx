@@ -334,7 +334,7 @@ function AddCompanyModal({ onClose, onResearching }: { onClose: () => void; onRe
 }
 
 export function AccountsPage() {
-  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount, setAccounts, profile } = useStore();
+  const { accounts, isUploading, uploadSuccess, setUploadSuccess, updateAccount, addAccounts, removeAccount, setAccounts } = useStore();
   const token = useAuthStore((s) => s.token);
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
