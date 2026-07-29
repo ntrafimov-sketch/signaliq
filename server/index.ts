@@ -189,6 +189,43 @@ app.delete('/api/accounts/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── LinkedIn photo proxy ─────────────────────────────────────────────────────
+
+const photoCache = new Map<string, string | null>();
+
+app.get('/api/linkedin-photo', async (req, res) => {
+  const url = req.query.url as string;
+  if (!url || !url.includes('linkedin.com/in/')) {
+    res.status(400).json({ error: 'Invalid LinkedIn URL' });
+    return;
+  }
+
+  if (photoCache.has(url)) {
+    const cached = photoCache.get(url);
+    if (cached) { res.redirect(cached); } else { res.status(404).end(); }
+    return;
+  }
+
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    const html = await resp.text();
+    const match = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+      || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+    const photoUrl = match?.[1] || null;
+    photoCache.set(url, photoUrl);
+    if (photoUrl) { res.redirect(photoUrl); } else { res.status(404).end(); }
+  } catch {
+    photoCache.set(url, null);
+    res.status(404).end();
+  }
+});
+
 // ── Clay webhooks ────────────────────────────────────────────────────────────
 
 app.post('/api/enrich', (req, res) => {

@@ -19,17 +19,15 @@ const sizeClasses = {
   xl: 'w-16 h-16 text-2xl',
 };
 
-function linkedinUsername(url?: string): string | null {
-  if (!url) return null;
-  const m = url.match(/linkedin\.com\/in\/([^/?#]+)/i);
-  return m ? m[1] : null;
-}
+
+const BACKEND = typeof window !== 'undefined'
+  ? (import.meta.env?.VITE_BACKEND_URL || '')
+  : '';
 
 export function Avatar({ name, email, linkedin, photoUrl, color, size = 'md', className }: AvatarProps) {
-  const liUsername = linkedinUsername(linkedin);
   const srcs = [
     photoUrl || null,
-    liUsername ? `https://unavatar.io/linkedin/${liUsername}?fallback=404` : null,
+    linkedin ? `${BACKEND}/api/linkedin-photo?url=${encodeURIComponent(linkedin)}` : null,
     email ? `https://unavatar.io/${encodeURIComponent(email)}?fallback=404` : null,
   ].filter(Boolean) as string[];
 
