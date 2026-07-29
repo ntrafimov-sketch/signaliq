@@ -237,12 +237,19 @@ export function PersonDetailPage() {
     setGenerateError(null);
 
     const clayWebhook = import.meta.env.VITE_CLAY_SEQUENCE_WEBHOOK;
-    // Torpedo JSON has all company/person data — skill in Clay handles the rest
+    // Build context from structured account data (torpedoData not needed)
     const payload = {
       account_id: account.id,
       person_id: person.id,
       person_name: person.name,
-      torpedo_json: account.torpedoData ?? [],
+      torpedo_json: [
+        { type: 'company_intel', data: { name: account.company_name, domain: account.domain, description: account.description, industry: account.industry, employees: account.employees, hq: account.hq, founded: account.founded, revenue: account.revenue } },
+        ...(account.people?.length ? [{ type: 'contacts', data: account.people }] : []),
+        ...(account.news?.length ? [{ type: 'news', data: account.news }] : []),
+        ...(account.signals?.length ? [{ type: 'signals', data: account.signals.map(s => ({ signal: s.title, type: s.type, priority: s.impact?.toUpperCase(), detail: s.description })) }] : []),
+        ...(account.whyMatters || account.opportunitySummary ? [{ type: 'strategy', data: { situation_summary: account.whyMatters, angles: account.opportunitySummary ? [{ angle: account.opportunitySummary.recommendedAngle, rationale: account.opportunitySummary.likelyPriorities }] : [] } }] : []),
+        ...(account.adIntelligence ? [{ type: 'ad_intelligence', data: account.adIntelligence }] : []),
+      ],
     };
 
     // 1. Try local bridge (python3 bridge.py running on port 7337)
