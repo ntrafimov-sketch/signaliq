@@ -758,7 +758,7 @@ export function AccountsPage() {
                         'text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors',
                         account.activeOutreach
                           ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                          : 'bg-gray-50 text-gray-400 border-gray-200 hover:bg-gray-100'
+                          : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
                       )}
                     >
                       {account.activeOutreach ? 'Yes' : 'No'}
