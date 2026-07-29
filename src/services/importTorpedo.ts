@@ -532,7 +532,10 @@ export function importTorpedoJson(
           linkedin_url?: string;
           email?: string;
           location?: string;
-          overview?: { current_title?: string; email?: string; location?: string; bio?: string };
+          photo_url?: string;
+          profile_pic_url?: string;
+          profile_image_url?: string;
+          overview?: { current_title?: string; email?: string; location?: string; bio?: string; photo_url?: string };
           career_track?: CareerEntry[];
           what_to_pitch?: { likely_priorities?: string; recommended_angle?: string };
           linkedin_posts?: {
@@ -544,6 +547,7 @@ export function importTorpedoJson(
           const location = c.location || c.overview?.location || '';
           const linkedin = c.linkedin || c.linkedin_url || '';
           const bio = c.overview?.bio;
+          const photoUrl = c.photo_url || c.profile_pic_url || c.profile_image_url || c.overview?.photo_url || undefined;
 
           // Map linkedin_posts.posts → recentPosts
           const rawPosts = c.linkedin_posts?.posts;
@@ -566,7 +570,7 @@ export function importTorpedoJson(
             id: genId('person'), accountId,
             name: c.name, title, company: companyName,
             department: guessDepartment(title),
-            location, tenure: '', linkedin, email, bio,
+            location, tenure: '', linkedin, email, bio, photoUrl,
             source: 'amplemarket' as const,
             influence: guessInfluence(title) as 'High' | 'Medium' | 'Low',
             avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],

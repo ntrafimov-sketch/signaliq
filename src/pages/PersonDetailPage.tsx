@@ -350,7 +350,7 @@ export function PersonDetailPage() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           {/* Left: avatar + name */}
           <div className="flex items-center gap-4">
-            <Avatar name={person.name} email={person.email} linkedin={person.linkedin} size="xl" color={person.avatarColor} />
+            <Avatar name={person.name} email={person.email} linkedin={person.linkedin} photoUrl={person.photoUrl} size="xl" color={person.avatarColor} />
             <div>
               <h1 className="text-xl font-bold text-gray-900">{person.name}</h1>
               <p className="text-sm text-gray-500 mt-0.5">{person.title} · {account.company_name}</p>

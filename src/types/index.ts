@@ -118,6 +118,7 @@ export interface Person {
   linkedin: string;
   email?: string;
   bio?: string;
+  photoUrl?: string;
   source?: 'amplemarket' | 'hubspot';
   influence: 'High' | 'Medium' | 'Low';
   avatarColor: string;

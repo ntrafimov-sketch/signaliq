@@ -5,6 +5,7 @@ interface AvatarProps {
   name: string;
   email?: string;
   linkedin?: string;
+  photoUrl?: string;
   color?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
@@ -24,9 +25,10 @@ function linkedinUsername(url?: string): string | null {
   return m ? m[1] : null;
 }
 
-export function Avatar({ name, email, linkedin, color, size = 'md', className }: AvatarProps) {
+export function Avatar({ name, email, linkedin, photoUrl, color, size = 'md', className }: AvatarProps) {
   const liUsername = linkedinUsername(linkedin);
   const srcs = [
+    photoUrl || null,
     liUsername ? `https://unavatar.io/linkedin/${liUsername}?fallback=404` : null,
     email ? `https://unavatar.io/${encodeURIComponent(email)}?fallback=404` : null,
   ].filter(Boolean) as string[];
