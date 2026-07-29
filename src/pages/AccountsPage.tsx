@@ -711,6 +711,9 @@ export function AccountsPage() {
                 <th className="px-4 py-3 text-left hidden md:table-cell">
                   <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Active Outreach</span>
                 </th>
+                <th className="px-4 py-3 text-left hidden lg:table-cell">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">SDR Owner</span>
+                </th>
                 <th className="px-4 py-3 text-left hidden sm:table-cell">
                   <button onClick={() => handleSort('lastUpdated')} className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700">
                     Added <SortIcon field="lastUpdated" />
@@ -796,17 +799,30 @@ export function AccountsPage() {
                       {account.activeOutreach ? 'Yes' : 'No'}
                     </button>
                   </td>
+                  <td className="px-4 py-3 hidden lg:table-cell" onClick={e => e.stopPropagation()}>
+                    <select
+                      value={account.sdrOwner || ''}
+                      onChange={e => {
+                        e.stopPropagation();
+                        const updated = { ...account, sdrOwner: e.target.value };
+                        updateAccount(account.id, { sdrOwner: e.target.value });
+                        syncAccount(updated, token);
+                      }}
+                      className="text-xs text-gray-700 bg-transparent border border-gray-200 rounded-lg px-2 py-1 hover:border-gray-300 focus:outline-none focus:border-violet-400 cursor-pointer"
+                    >
+                      <option value="">—</option>
+                      <option value="Bogdan">Bogdan</option>
+                      <option value="Polina">Polina</option>
+                      <option value="Eddie">Eddie</option>
+                      <option value="Oleg">Oleg</option>
+                    </select>
+                  </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm text-gray-500">
-                        {account.addedAt
-                          ? new Date(account.addedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                          : account.lastUpdated}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        by {(account.addedBy || profile.name).split(' ')[0]}
-                      </span>
-                    </div>
+                    <span className="text-sm text-gray-500">
+                      {account.addedAt
+                        ? new Date(account.addedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : account.lastUpdated}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

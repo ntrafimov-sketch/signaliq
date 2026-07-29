@@ -61,6 +61,7 @@ export interface Account {
   addedBy?: string;
   notes?: string;
   activeOutreach?: boolean;
+  sdrOwner?: string;
   description: string;
   founded: string;
   hq: string;
