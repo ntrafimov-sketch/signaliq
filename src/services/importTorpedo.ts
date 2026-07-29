@@ -535,7 +535,8 @@ export function importTorpedoJson(
           photo_url?: string;
           profile_pic_url?: string;
           profile_image_url?: string;
-          overview?: { current_title?: string; email?: string; location?: string; bio?: string; photo_url?: string };
+          profile_picture_url?: string;
+          overview?: { current_title?: string; email?: string; location?: string; bio?: string; photo_url?: string; profile_picture_url?: string };
           career_track?: CareerEntry[];
           what_to_pitch?: { likely_priorities?: string; recommended_angle?: string };
           linkedin_posts?: {
@@ -547,7 +548,7 @@ export function importTorpedoJson(
           const location = c.location || c.overview?.location || '';
           const linkedin = c.linkedin || c.linkedin_url || '';
           const bio = c.overview?.bio;
-          const photoUrl = c.photo_url || c.profile_pic_url || c.profile_image_url || c.overview?.photo_url || undefined;
+          const photoUrl = c.profile_picture_url || c.photo_url || c.profile_pic_url || c.profile_image_url || c.overview?.profile_picture_url || c.overview?.photo_url || undefined;
 
           // Map linkedin_posts.posts → recentPosts
           const rawPosts = c.linkedin_posts?.posts;
