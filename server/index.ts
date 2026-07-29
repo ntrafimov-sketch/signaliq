@@ -298,6 +298,12 @@ app.get('/{*path}', (_req, res) => {
   res.sendFile(join(distDir, 'index.html'));
 });
 
+// Suppress noisy "request aborted" errors from body-parser when clients disconnect
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err?.type === 'request.aborted' || err?.message === 'request aborted') return;
+  next(err);
+});
+
 server.listen(PORT, () => {
   console.log(`SignalIQ backend running on port ${PORT}`);
   console.log(`API key: ${API_KEY}`);
