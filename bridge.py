@@ -122,21 +122,34 @@ def paste_prompt_to_claude(prompt: str) -> None:
     import time as _time
     _time.sleep(0.5)
     open_new_home_chat()
+    _time.sleep(0.5)  # extra wait for new chat textarea to focus
 
     script = f"""
 tell application "System Events"
     tell process "{CLAUDE_APP}"
         do shell script "cat " & quoted form of "{safe_tmp}" & " | pbcopy"
-        delay 0.3
+        delay 0.4
+        -- Click bottom-center of window to ensure textarea is focused
+        set w to window 1
+        set wpos to position of w
+        set wsz to size of w
+        set clickX to (item 1 of wpos) + (item 1 of wsz) / 2
+        set clickY to (item 2 of wpos) + (item 2 of wsz) - 80
+        click at {{clickX as integer, clickY as integer}}
+        delay 0.4
         keystroke "v" using command down
-        delay 0.3
+        delay 0.5
         key code 36
     end tell
 end tell
 do shell script "rm -f " & quoted form of "{safe_tmp}"
 """
     try:
-        subprocess.run(["osascript", "-e", script], check=True)
+        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"  ✗ AppleScript error (paste): {r.stderr.strip()}")
+        else:
+            print(f"  ✓ Prompt pasted ({len(prompt)} chars)")
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
