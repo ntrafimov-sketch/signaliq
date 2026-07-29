@@ -259,7 +259,7 @@ export function PersonDetailPage() {
         await fetch('http://localhost:7337/sequence', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ person, account, signals: account.signals }),
+          body: JSON.stringify({ person, account, signals: account.signals, torpedo_json: payload.torpedo_json }),
         });
         setGenerating(true); // keep spinner — result comes via WebSocket
         return;
