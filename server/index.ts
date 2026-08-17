@@ -93,6 +93,26 @@ async function loadFromDb() {
   accountsCache = accountsRes.rows.map(r => r.data);
   torpedoQueue = queueRes.rows.map(r => ({ id: r.id, account_id: r.account_id, company_name: r.company_name, data: r.data }));
   console.log(`[db] loaded ${usersCache.length} users, ${accountsCache.length} accounts, ${torpedoQueue.length} pending torpedo items`);
+  // Process any pending torpedo items immediately on startup
+  if (torpedoQueue.length > 0) {
+    console.log(`[db] processing ${torpedoQueue.length} pending torpedo items...`);
+    const LOGO_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6', '#10b981'];
+    for (const item of [...torpedoQueue]) {
+      try {
+        const updates = importTorpedoJson(item.data as any[], item.account_id, item.company_name);
+        const existing = accountsCache.find((a: any) => a.id === item.account_id || (a.domain && a.domain === (updates as any).domain));
+        const account = existing
+          ? { ...existing, ...updates, lastUpdated: new Date().toISOString() }
+          : { id: item.account_id, company_name: item.company_name, domain: item.account_id, logoColor: LOGO_COLORS[Math.abs(item.account_id.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0)) % LOGO_COLORS.length], addedAt: new Date().toISOString(), enrichmentStatus: 'done', ...updates, lastUpdated: new Date().toISOString() };
+        await upsertAccount(account);
+        await removeTorpedoFromQueue(item.account_id);
+        console.log(`[db] processed queued torpedo: ${item.company_name}`);
+      } catch (err) {
+        console.error(`[db] failed to process torpedo for ${item.company_name}:`, err);
+      }
+    }
+    console.log(`[db] torpedo queue processing complete, accounts now: ${accountsCache.length}`);
+  }
 }
 
 async function saveTorpedoToQueue(account_id: string, company_name: string, data: unknown[]) {
