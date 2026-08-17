@@ -363,11 +363,12 @@ export function AccountsPage() {
         }
         return;
       }
-      // Merge: server accounts win on conflict, but local-only accounts get re-uploaded
-      // Dedup by both ID and domain to prevent duplicates when multiple users sync
+      // Server is the source of truth for all data (incl. heavy fields like people/news/revenueHistory).
+      // Local store only holds lightweight metadata; prefer server data on conflict.
       const serverIds = new Set((serverAccounts as Account[]).map(a => a.id));
       const serverDomains = new Set((serverAccounts as Account[]).map(a => a.domain).filter(Boolean));
       const serverNames = new Set((serverAccounts as Account[]).map(a => a.company_name.toLowerCase().trim()));
+      // Accounts that only exist locally (added offline / not yet synced)
       const localOnly = localAccounts.filter(a =>
         !serverIds.has(a.id) &&
         !serverDomains.has(a.domain) &&
@@ -387,24 +388,10 @@ export function AccountsPage() {
         })
         .map(a => {
           const local = localById.get(a.id);
-          if (!local) return a;
-          // Server strips large raw fields — restore enriched data from localStorage
-          const restored: Partial<Account> = {};
-          if (local.people?.length) restored.people = local.people;
-          if (local.news?.length) restored.news = local.news;
-          if (local.adIntelligence) restored.adIntelligence = local.adIntelligence;
-          if (local.orgChart) restored.orgChart = local.orgChart;
-          if (local.investmentHistory?.length) restored.investmentHistory = local.investmentHistory;
-          if (local.departmentIntel) restored.departmentIntel = local.departmentIntel;
-          if (local.revenueHistory?.length) restored.revenueHistory = local.revenueHistory;
-          if (local.downloadHistory?.length) restored.downloadHistory = local.downloadHistory;
-          if (local.paywallAnalysis) restored.paywallAnalysis = local.paywallAnalysis;
-          if (local.opportunitySummary) restored.opportunitySummary = local.opportunitySummary;
-          if (local.whyMatters) restored.whyMatters = local.whyMatters;
-          if (local.products?.length) restored.products = local.products;
-          const enrichmentStatus = (local.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching')
+          // Fix enrichmentStatus if local says 'done' but server still has 'enriching'
+          const enrichmentStatus = (local?.enrichmentStatus === 'done' && a.enrichmentStatus === 'enriching')
             ? 'done' as const : a.enrichmentStatus;
-          return { ...a, ...restored, enrichmentStatus };
+          return { ...a, enrichmentStatus };
         });
       // Merge local-only accounts into the server list
       const merged = [...serverMerged, ...localOnly];
