@@ -37,6 +37,13 @@ async function initDb() {
       data JSONB NOT NULL,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS torpedo_queue (
+      id SERIAL PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      company_name TEXT NOT NULL,
+      data JSONB NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
   console.log('[db] tables ready');
 }
@@ -72,14 +79,37 @@ function stripHeavy(a: any) {
 let accountsCache: any[] = [];
 let usersCache: User[] = [];
 
+// In-memory torpedo queue (pending items not yet processed by any client)
+let torpedoQueue: Array<{ id: number; account_id: string; company_name: string; data: unknown[] }> = [];
+
 async function loadFromDb() {
-  const [usersRes, accountsRes] = await Promise.all([
+  const [usersRes, accountsRes, queueRes] = await Promise.all([
     pool.query('SELECT id, email, name, password_hash, created_at FROM users'),
     pool.query('SELECT data FROM accounts WHERE (data->>\'enrichmentStatus\') != \'enriching\' OR (data->>\'enrichmentStatus\') IS NULL ORDER BY updated_at DESC'),
+    pool.query('SELECT id, account_id, company_name, data FROM torpedo_queue ORDER BY created_at ASC'),
   ]);
   usersCache = usersRes.rows.map(r => ({ id: r.id, email: r.email, name: r.name, passwordHash: r.password_hash, createdAt: r.created_at }));
   accountsCache = accountsRes.rows.map(r => r.data);
-  console.log(`[db] loaded ${usersCache.length} users, ${accountsCache.length} accounts`);
+  torpedoQueue = queueRes.rows.map(r => ({ id: r.id, account_id: r.account_id, company_name: r.company_name, data: r.data }));
+  console.log(`[db] loaded ${usersCache.length} users, ${accountsCache.length} accounts, ${torpedoQueue.length} pending torpedo items`);
+}
+
+async function saveTorpedoToQueue(account_id: string, company_name: string, data: unknown[]) {
+  // Remove old entries for same account to avoid duplicates
+  await pool.query('DELETE FROM torpedo_queue WHERE account_id = $1', [account_id]);
+  torpedoQueue = torpedoQueue.filter(t => t.account_id !== account_id);
+  const res = await pool.query(
+    'INSERT INTO torpedo_queue (account_id, company_name, data) VALUES ($1, $2, $3) RETURNING id',
+    [account_id, company_name, JSON.stringify(data)]
+  );
+  const id = res.rows[0].id;
+  torpedoQueue.push({ id, account_id, company_name, data });
+  console.log(`[db] torpedo queued for ${company_name} (id=${id})`);
+}
+
+async function removeTorpedoFromQueue(account_id: string) {
+  await pool.query('DELETE FROM torpedo_queue WHERE account_id = $1', [account_id]);
+  torpedoQueue = torpedoQueue.filter(t => t.account_id !== account_id);
 }
 
 async function upsertAccount(account: any) {
@@ -124,6 +154,10 @@ wss.on('connection', (ws) => {
   clients.add(ws);
   // Send current accounts to new client (from in-memory cache)
   ws.send(JSON.stringify({ event: 'init', data: { accounts: accountsCache } }));
+  // Replay any pending torpedo items so client can process & save them
+  for (const item of torpedoQueue) {
+    ws.send(JSON.stringify({ event: 'enrich', data: { account_id: item.account_id, company_name: item.company_name, data: item.data } }));
+  }
   ws.on('close', () => clients.delete(ws));
 });
 
@@ -189,7 +223,11 @@ app.post('/api/accounts', requireAuth, async (req, res) => {
   if (account.enrichmentStatus === 'enriching') { res.json({ ok: true, skipped: true }); return; }
   try {
     await upsertAccount(account);
+    // Remove from torpedo queue if present (client confirmed it processed this account)
+    if (account.domain) removeTorpedoFromQueue(account.domain).catch(() => {});
+    if (account.id) removeTorpedoFromQueue(account.id).catch(() => {});
     broadcast('accounts_updated', { accounts: accountsCache });
+    console.log(`[db] saved account: ${account.company_name || account.id}`);
     res.json({ ok: true });
   } catch (e) { console.error('[db] upsert error:', e); res.status(500).json({ error: 'DB error' }); }
 });
@@ -275,9 +313,11 @@ app.post('/api/enrich', (req, res) => {
 
   if (!data) { res.status(400).json({ error: 'data is required' }); return; }
 
-  // Respond immediately so Clay doesn't timeout, then broadcast
+  // Respond immediately so Clay doesn't timeout
   res.json({ ok: true });
   console.log('[enrich] account_id:', account_id, 'company_name:', company_name);
+  // Save to persistent queue so data survives server restarts and offline clients
+  saveTorpedoToQueue(account_id, company_name, data as unknown[]).catch(e => console.error('[db] torpedo queue error:', e));
   setImmediate(() => broadcast('enrich', { account_id, company_name, data }));
 });
 
