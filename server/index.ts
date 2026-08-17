@@ -235,6 +235,21 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
 
 // ── Accounts endpoints ───────────────────────────────────────────────────────
 
+app.get('/api/debug/account', async (_req, res) => {
+  const r = await pool.query('SELECT data FROM accounts LIMIT 1');
+  if (!r.rows.length) { res.json({ error: 'no accounts' }); return; }
+  const d = r.rows[0].data;
+  res.json({
+    id: d.id,
+    company_name: d.company_name,
+    fields: Object.keys(d),
+    people_count: d.people?.length ?? 'missing',
+    news_count: d.news?.length ?? 'missing',
+    revenueHistory_count: d.revenueHistory?.length ?? 'missing',
+    signals_count: d.signals?.length ?? 'missing',
+  });
+});
+
 app.get('/api/accounts', requireAuth, (_req, res) => {
   res.json(accountsCache);
 });
