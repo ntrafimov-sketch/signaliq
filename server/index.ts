@@ -4,9 +4,10 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import pg from 'pg';
+const { Pool } = pg;
 
 const app = express();
 const server = createServer(app);
@@ -14,8 +15,31 @@ const wss = new WebSocketServer({ server });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = join(__dirname, '../dist');
-const DATA_FILE = join(__dirname, 'data.json');
 const JWT_SECRET = process.env.JWT_SECRET || 'signaliq-jwt-secret-2024';
+
+// ── PostgreSQL ───────────────────────────────────────────────────────────────
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('railway.internal') ? false : { rejectUnauthorized: false },
+});
+
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY,
+      data JSONB NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  console.log('[db] tables ready');
+}
 
 const API_KEY = process.env.WEBHOOK_API_KEY || 'signaliq-dev-key';
 const API_KEY_CLAY = process.env.WEBHOOK_API_KEY_CLAY || 'signaliq-clay-key';
@@ -25,7 +49,7 @@ function isValidKey(key: unknown): boolean {
 }
 const PORT = process.env.PORT || 3001;
 
-// ── Persistent storage ──────────────────────────────────────────────────────
+// ── Persistent storage (PostgreSQL) ─────────────────────────────────────────
 
 interface User {
   id: string;
@@ -33,20 +57,6 @@ interface User {
   name: string;
   passwordHash: string;
   createdAt: string;
-}
-
-interface ServerData {
-  users: User[];
-  accounts: unknown[];
-}
-
-function loadData(): ServerData {
-  try {
-    if (existsSync(DATA_FILE)) {
-      return JSON.parse(readFileSync(DATA_FILE, 'utf-8'));
-    }
-  } catch { /* ignore */ }
-  return { users: [], accounts: [] };
 }
 
 // Strip only torpedoData (raw input JSON, ~200KB per account) and paywallScreenshot (binary).
@@ -58,26 +68,35 @@ function stripHeavy(a: any) {
   return rest;
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
-function saveData() {
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    try {
-      const toSave = { users: db.users, accounts: (db.accounts as any[]).map(stripHeavy) };
-      writeFileSync(DATA_FILE, JSON.stringify(toSave), 'utf-8');
-    } catch (e) {
-      console.error('[server] failed to save data:', e);
-    }
-  }, 2000);
+// In-memory cache so WebSocket init is instant
+let accountsCache: any[] = [];
+let usersCache: User[] = [];
+
+async function loadFromDb() {
+  const [usersRes, accountsRes] = await Promise.all([
+    pool.query('SELECT id, email, name, password_hash, created_at FROM users'),
+    pool.query('SELECT data FROM accounts WHERE (data->>\'enrichmentStatus\') != \'enriching\' OR (data->>\'enrichmentStatus\') IS NULL ORDER BY updated_at DESC'),
+  ]);
+  usersCache = usersRes.rows.map(r => ({ id: r.id, email: r.email, name: r.name, passwordHash: r.password_hash, createdAt: r.created_at }));
+  accountsCache = accountsRes.rows.map(r => r.data);
+  console.log(`[db] loaded ${usersCache.length} users, ${accountsCache.length} accounts`);
 }
 
-const db: ServerData = loadData();
-// Remove any stale enriching placeholders that should never have been persisted
-const beforeClean = db.accounts.length;
-db.accounts = (db.accounts as any[]).filter((a: any) => a.enrichmentStatus !== 'enriching');
-if (db.accounts.length !== beforeClean) saveData();
-console.log(`[server] loaded ${db.users.length} users, ${db.accounts.length} accounts from disk (cleaned ${beforeClean - db.accounts.length} enriching placeholders)`);
+async function upsertAccount(account: any) {
+  const clean = stripHeavy(account);
+  await pool.query(
+    `INSERT INTO accounts (id, data, updated_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+    [clean.id, JSON.stringify(clean)]
+  );
+  const idx = accountsCache.findIndex(a => a.id === clean.id);
+  if (idx >= 0) accountsCache[idx] = clean; else accountsCache.push(clean);
+}
+
+async function deleteAccount(id: string) {
+  await pool.query('DELETE FROM accounts WHERE id = $1', [id]);
+  accountsCache = accountsCache.filter(a => a.id !== id);
+}
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 
@@ -103,8 +122,8 @@ const clients = new Set<WebSocket>();
 
 wss.on('connection', (ws) => {
   clients.add(ws);
-  // Send current accounts to new client
-  ws.send(JSON.stringify({ event: 'init', data: { accounts: db.accounts } }));
+  // Send current accounts to new client (from in-memory cache)
+  ws.send(JSON.stringify({ event: 'init', data: { accounts: accountsCache } }));
   ws.on('close', () => clients.delete(ws));
 });
 
@@ -127,27 +146,24 @@ app.post('/api/auth/register', async (req, res) => {
     res.status(400).json({ error: 'email, name, and password are required' });
     return;
   }
-  if (db.users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+  if (usersCache.find(u => u.email.toLowerCase() === email.toLowerCase())) {
     res.status(409).json({ error: 'Email already registered' });
     return;
   }
-  const passwordHash = await bcrypt.hash(password, 10);
-  const user: User = {
-    id: `user-${Date.now()}`,
-    email: email.toLowerCase(),
-    name,
-    passwordHash,
-    createdAt: new Date().toISOString(),
-  };
-  db.users.push(user);
-  saveData();
-  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user: User = { id: `user-${Date.now()}`, email: email.toLowerCase(), name, passwordHash, createdAt: new Date().toISOString() };
+    await pool.query('INSERT INTO users (id, email, name, password_hash, created_at) VALUES ($1,$2,$3,$4,$5)',
+      [user.id, user.email, user.name, user.passwordHash, user.createdAt]);
+    usersCache.push(user);
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+  } catch (e) { res.status(500).json({ error: 'Registration failed' }); }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = db.users.find(u => u.email.toLowerCase() === email?.toLowerCase());
+  const user = usersCache.find(u => u.email.toLowerCase() === email?.toLowerCase());
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     res.status(401).json({ error: 'Invalid email or password' });
     return;
@@ -157,7 +173,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.get('/api/auth/me', requireAuth, (req, res) => {
-  const user = db.users.find(u => u.id === (req as any).userId);
+  const user = usersCache.find(u => u.id === (req as any).userId);
   if (!user) { res.status(404).json({ error: 'User not found' }); return; }
   res.json({ id: user.id, email: user.email, name: user.name });
 });
@@ -165,28 +181,25 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
 // ── Accounts endpoints ───────────────────────────────────────────────────────
 
 app.get('/api/accounts', requireAuth, (_req, res) => {
-  res.json(db.accounts);
+  res.json(accountsCache);
 });
 
-app.post('/api/accounts', requireAuth, (req, res) => {
+app.post('/api/accounts', requireAuth, async (req, res) => {
   const account = stripHeavy(req.body);
   if (account.enrichmentStatus === 'enriching') { res.json({ ok: true, skipped: true }); return; }
-  const existing = (db.accounts as any[]).findIndex((a: any) => a.id === account.id);
-  if (existing >= 0) {
-    (db.accounts as any[])[existing] = account;
-  } else {
-    db.accounts.push(account);
-  }
-  saveData();
-  broadcast('accounts_updated', { accounts: db.accounts });
-  res.json({ ok: true });
+  try {
+    await upsertAccount(account);
+    broadcast('accounts_updated', { accounts: accountsCache });
+    res.json({ ok: true });
+  } catch (e) { console.error('[db] upsert error:', e); res.status(500).json({ error: 'DB error' }); }
 });
 
-app.delete('/api/accounts/:id', requireAuth, (req, res) => {
-  db.accounts = (db.accounts as any[]).filter((a: any) => a.id !== req.params.id);
-  saveData();
-  broadcast('accounts_updated', { accounts: db.accounts });
-  res.json({ ok: true });
+app.delete('/api/accounts/:id', requireAuth, async (req, res) => {
+  try {
+    await deleteAccount(String(req.params.id));
+    broadcast('accounts_updated', { accounts: accountsCache });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'DB error' }); }
 });
 
 // ── LinkedIn photo proxy ─────────────────────────────────────────────────────
@@ -304,7 +317,15 @@ app.use((err: any, _req: express.Request, res: express.Response, next: express.N
   next(err);
 });
 
-server.listen(PORT, () => {
-  console.log(`SignalIQ backend running on port ${PORT}`);
-  console.log(`API key: ${API_KEY}`);
-});
+initDb()
+  .then(() => loadFromDb())
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`SignalIQ backend running on port ${PORT}`);
+      console.log(`API key: ${API_KEY}`);
+    });
+  })
+  .catch(err => {
+    console.error('[db] failed to init:', err);
+    process.exit(1);
+  });
