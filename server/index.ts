@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import pg from 'pg';
 const { Pool } = pg;
+import { importTorpedoJson } from './importTorpedo.js';
 
 const app = express();
 const server = createServer(app);
@@ -316,9 +317,40 @@ app.post('/api/enrich', (req, res) => {
   // Respond immediately so Clay doesn't timeout
   res.json({ ok: true });
   console.log('[enrich] account_id:', account_id, 'company_name:', company_name);
-  // Save to persistent queue so data survives server restarts and offline clients
-  saveTorpedoToQueue(account_id, company_name, data as unknown[]).catch(e => console.error('[db] torpedo queue error:', e));
-  setImmediate(() => broadcast('enrich', { account_id, company_name, data }));
+
+  setImmediate(async () => {
+    try {
+      // Process torpedo JSON server-side and save directly to PostgreSQL
+      const updates = importTorpedoJson(data as any[], account_id, company_name);
+      const LOGO_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6', '#10b981'];
+      const existing = accountsCache.find((a: any) =>
+        a.id === account_id || (a.domain && a.domain === (updates as any).domain)
+      );
+      const account = existing
+        ? { ...existing, ...updates, lastUpdated: new Date().toISOString() }
+        : {
+            id: account_id,
+            company_name,
+            domain: account_id,
+            logoColor: LOGO_COLORS[Math.floor(Math.random() * LOGO_COLORS.length)],
+            addedAt: new Date().toISOString(),
+            enrichmentStatus: 'done',
+            ...updates,
+            lastUpdated: new Date().toISOString(),
+          };
+      await upsertAccount(account);
+      console.log(`[enrich] saved ${company_name} to PostgreSQL`);
+      // Remove from torpedo queue if present
+      await removeTorpedoFromQueue(account_id).catch(() => {});
+      // Broadcast updated accounts to all clients
+      broadcast('accounts_updated', { accounts: accountsCache });
+    } catch (err) {
+      console.error('[enrich] server-side processing failed:', err);
+      // Fallback: save raw torpedo to queue so client can process it
+      saveTorpedoToQueue(account_id, company_name, data as unknown[]).catch(e => console.error('[db] torpedo queue error:', e));
+      broadcast('enrich', { account_id, company_name, data });
+    }
+  });
 });
 
 app.post('/api/sequence-result', (req, res) => {

@@ -1,0 +1,792 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Signal = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Account = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Person = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CareerEntry = any;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TorpedoEntry = { type: string; data: any; notes?: string; store?: string; summary?: any };
+
+function genId(prefix = 'sig') {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+const AVATAR_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#3b82f6', '#10b981'];
+
+const HIRING_RE = /\b(hir(ing|ed?)|recruit|job posting|open role|new (gm|cto|cpo|vp|director)|leadership (gap|vacuum)|building.*team|expanding.*team|head of.*role)\b/i;
+
+function isHiringSignal(text: string): boolean {
+  return HIRING_RE.test(text);
+}
+
+function fmt(n: number) {
+  return n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${Math.round(n / 1_000)}K` : `$${Math.round(n)}`;
+}
+
+export function importTorpedoJson(
+  entries: TorpedoEntry[],
+  accountId: string,
+  companyName: string
+): Partial<Account> {
+  const today = new Date().toISOString().split('T')[0];
+  const signals: Signal[] = [];
+  const updates: Partial<Account> = {};
+  const mtrByStore: Record<string, number> = {};
+  const revByDate = new Map<string, { ios: number; android: number }>();
+  const dlByDate = new Map<string, { ios: number; android: number }>();
+
+  // Scoring accumulators
+  let revTrendPct = 0;
+  let dlTrendPct = 0;
+  let hubspotOpens = 0;
+  let hubspotClicks = 0;
+  let hubspotDemos = 0;
+  let jobPostingCount = 0;
+  let contactCount = 0;
+  let hasPaywall = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let investmentRounds: any[] = [];
+
+  for (const entry of entries) {
+    if (!entry || !entry.type || entry.data === undefined) continue;
+    switch (entry.type) {
+
+      case 'company_intel': {
+        const d = entry.data;
+        updates.description = d.description || d.business_model || d.name;
+        updates.hq = d.hq || d.location || '';
+        // employees: prefer numeric field, fallback to parsing string
+        updates.employees = typeof d.employees === 'number' ? d.employees
+          : typeof d.headcount === 'number' ? d.headcount
+          : parseInt(String(d.employees || d.headcount || '0').replace(/\D.*/, '')) || 0;
+        updates.industry = d.industry || '';
+        // revenue: prefer actual revenue fields over funding
+        updates.revenue = d.actual_revenue_fy2024 || d.estimated_revenue || d.funding
+          || (d.total_funding_usd ? `${fmt(d.total_funding_usd)} raised` : '');
+        // status: prefer company type
+        updates.status = d.type || (d.amplemarket_account_status?.includes('customer') ? 'Customer' : (d.stage || 'Private'));
+        updates.founded = d.founded ? String(d.founded) : (d.latest_round?.date?.slice(0, 4) || '');
+        if (d.total_funding_usd || d.funding || d.latest_round) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Revenue Increase', category: 'Revenue', source: 'Research',
+            date: d.latest_funding_date || d.latest_round?.date || today,
+            confidence: 'High', impact: 'High',
+            title: `Funding: ${d.funding || fmt(d.total_funding_usd || 0)} raised · ${d.latest_funding_stage || d.latest_round?.stage || ''}`.trim().replace(/ · $/, ''),
+            description: d.description || '',
+          });
+        }
+        break;
+      }
+
+      case 'investments': {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rounds = Array.isArray(entry.data) ? entry.data : [];
+        investmentRounds = rounds;
+        updates.investmentHistory = rounds.map((r: any) => ({
+          round: r.round || r.stage || 'Investment',
+          amount: r.amount_usd ? fmt(r.amount_usd) : (r.amount || ''),
+          investors: Array.isArray(r.investors) ? r.investors : (r.lead_investor ? [r.lead_investor] : []),
+          date: r.date || '',
+        }));
+        break;
+      }
+
+      case 'revenue_history': {
+        // New format: flat array with store field per record
+        // Old format: entry.store + flat array without store field
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawData: any[] = Array.isArray(entry.data) ? entry.data : [];
+        const entryStore: string = entry.store || '';
+
+        // Group by store
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const byStore: Record<string, any[]> = {};
+        for (const p of rawData) {
+          const store = p.store || entryStore || 'ios';
+          if (!byStore[store]) byStore[store] = [];
+          byStore[store].push(p);
+        }
+
+        for (const [store, points] of Object.entries(byStore)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const filtered = points.filter((p: any) => !p.note?.includes('Partial'));
+          // Group by date: prefer WW record; if no WW, sum country-level records
+          const byDateMap = new Map<string, number>();
+          const wwByDate = new Map<string, number>();
+          for (const p of filtered) {
+            const rev = (p.revenue as number) || 0;
+            const country = (p.country || '').toUpperCase();
+            if (country === 'WW') {
+              wwByDate.set(p.date, rev);
+            } else {
+              byDateMap.set(p.date, (byDateMap.get(p.date) ?? 0) + rev);
+            }
+          }
+          // WW takes priority over summed country-level
+          const mergedDates = new Set([...wwByDate.keys(), ...byDateMap.keys()]);
+          const storeKey = store.toLowerCase().includes('ios') ? 'ios' : 'android';
+          for (const date of mergedDates) {
+            const rev = wwByDate.has(date) ? wwByDate.get(date)! : (byDateMap.get(date) ?? 0);
+            const existing = revByDate.get(date) ?? { ios: 0, android: 0 };
+            existing[storeKey] = rev;
+            revByDate.set(date, existing);
+          }
+          // MTR from last date (prefer WW)
+          const allDates = [...mergedDates].sort();
+          if (allDates.length > 0) {
+            const lastDate = allDates[allDates.length - 1];
+            const lastRev = wwByDate.get(lastDate) ?? byDateMap.get(lastDate) ?? 0;
+            if (lastRev > 0) mtrByStore[store] = lastRev;
+          }
+          if (allDates.length >= 4) {
+            const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+            const revs = allDates.map(d => wwByDate.get(d) ?? byDateMap.get(d) ?? 0);
+            const recent = avg(revs.slice(-3));
+            const prior = avg(revs.slice(-6, -3));
+            const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
+            revTrendPct = Math.max(revTrendPct, pct);
+            const abs = Math.abs(pct);
+            const type = pct > 10 ? 'Revenue Increase' : pct < -10 ? 'Revenue Decrease' : 'Revenue Plateau';
+            signals.push({
+              id: genId(), accountId, accountName: companyName,
+              type, category: 'Revenue', source: 'AppMagic',
+              date: today, confidence: 'High', impact: abs > 20 ? 'High' : 'Medium',
+              title: type === 'Revenue Plateau'
+                ? `${store.toUpperCase()} revenue plateau ±${abs}% MoM`
+                : `${store.toUpperCase()} revenue ${pct > 0 ? '+' : ''}${pct}% MoM`,
+              description: `Last month: ${fmt(revs[revs.length - 1])}`,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'download_history': {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawData: any[] = Array.isArray(entry.data) ? entry.data : [];
+        const entryStore: string = entry.store || '';
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const byStore: Record<string, any[]> = {};
+        for (const p of rawData) {
+          const store = p.store || entryStore || 'ios';
+          if (!byStore[store]) byStore[store] = [];
+          byStore[store].push(p);
+        }
+
+        for (const [store, points] of Object.entries(byStore)) {
+          for (const p of points) {
+            const existing = dlByDate.get(p.date) ?? { ios: 0, android: 0 };
+            if (store === 'ios') existing.ios = p.downloads || 0;
+            else existing.android = p.downloads || 0;
+            dlByDate.set(p.date, existing);
+          }
+          if (points.length >= 4) {
+            const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+            const vals = points.map((p: { downloads?: number }) => p.downloads || 0);
+            const recent = avg(vals.slice(-3));
+            const prior = avg(vals.slice(-6, -3));
+            const pct = prior > 0 ? Math.round(((recent - prior) / prior) * 100) : 0;
+            dlTrendPct = Math.max(dlTrendPct, pct);
+            const abs = Math.abs(pct);
+            const type = pct > 10 ? 'Download Increase' : pct < -10 ? 'Download Decrease' : 'Download Plateau';
+            signals.push({
+              id: genId(), accountId, accountName: companyName,
+              type, category: 'Downloads', source: 'AppMagic',
+              date: today, confidence: 'High', impact: abs > 20 ? 'High' : 'Medium',
+              title: `${store.toUpperCase()} installs ${pct > 0 ? '+' : ''}${pct}% MoM`,
+              description: `Avg last 3 months: ${Math.round(recent).toLocaleString()} downloads/mo.`,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'org_chart': {
+        const d = entry.data;
+        const STANDARD = ['c_level', 'vp_director', 'manager_ic', 'unknown'];
+        // If already in standard format — use as-is
+        if (STANDARD.some(k => d[k])) {
+          updates.orgChart = d;
+        } else {
+          // Flatten all arrays from any key structure into standard buckets by title
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const allPeople: any[] = Object.values(d).flat();
+          const c_level: typeof allPeople = [];
+          const vp_director: typeof allPeople = [];
+          const manager_ic: typeof allPeople = [];
+          const unknown: typeof allPeople = [];
+          for (const p of allPeople) {
+            const t = (p.title || '').toLowerCase();
+            if (t.includes('ceo') || t.includes('coo') || t.includes('cto') || t.includes('cpo') || t.includes('cfo') || t.includes('svp') || t.includes('evp') || t.includes('chief') || t.includes('founder')) {
+              c_level.push(p);
+            } else if (t.includes('vp') || t.includes('vice president') || t.includes('director') || t.includes('head of') || t.includes('gm') || t.includes('general manager') || t.includes('president')) {
+              vp_director.push(p);
+            } else if (t.includes('manager') || t.includes('lead') || t.includes('senior') || t.includes('engineer') || t.includes('analyst') || t.includes('specialist') || t.includes('designer') || t.includes('pm') || t.includes('product')) {
+              manager_ic.push(p);
+            } else {
+              unknown.push(p);
+            }
+          }
+          updates.orgChart = { c_level, vp_director, manager_ic, unknown };
+        }
+        break;
+      }
+
+      case 'products': {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const productList = Array.isArray(entry.data) ? entry.data : [];
+        if (productList.some((p: any) => p.has_in_app_purchases === true)) hasPaywall = true;
+        updates.products = productList.map((p: any) => ({
+          app_name: p.app_name || p.name || '',
+          platform: p.platform || 'both',
+          has_in_app_purchases: p.has_in_app_purchases ?? null,
+          store_url_ios: p.store_url_ios || p.store_id_ios ? `https://apps.apple.com/app/id${p.store_id_ios}` : undefined,
+          store_url_android: p.store_url_android,
+          description: p.description,
+        }));
+        break;
+      }
+
+      case 'sdk_scan':
+      case 'app_sdks':
+      case 'sdks': {
+        const PAYWALL = ['revenuecat', 'superwall', 'purchasely', 'qonversion', 'apphud'];
+        const LIFECYCLE = ['braze', 'customer.io', 'customerio', 'clevertap', 'leanplum', 'intercom'];
+        // Normalize: handle string[], {name}[], {ios:[],android:[]}, or plain object
+        const toNameObjs = (arr: unknown[]): { name: string }[] =>
+          arr.map(s => typeof s === 'string' ? { name: s } : (s as { name: string }));
+        let rawList: unknown[];
+        if (Array.isArray(entry.data)) {
+          rawList = entry.data;
+        } else {
+          const d = entry.data as Record<string, unknown[]>;
+          rawList = [...(d.ios || []), ...(d.android || [])];
+        }
+        const sdkList = toNameObjs(rawList).filter((s, i, arr) =>
+          s.name && arr.findIndex(x => x.name === s.name) === i
+        );
+        const paywall = sdkList.filter(s => s.name && PAYWALL.some(p => s.name.toLowerCase().includes(p)));
+        const lifecycle = sdkList.filter(s => s.name && LIFECYCLE.some(l => s.name.toLowerCase().includes(l)));
+        if (paywall.length) hasPaywall = true;
+        if (paywall.length) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Using Competitors', category: 'Competitive', source: 'AppMagic',
+            date: today, confidence: 'High', impact: 'High',
+            title: `Paywall SDK: ${paywall.map(s => s.name).join(' + ')}`,
+            description: `Detected competitor SDKs: ${paywall.map(s => s.name).join(', ')}. Direct displacement opportunity.`,
+          });
+        }
+        if (lifecycle.length) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Using Competitors', category: 'Competitive', source: 'AppMagic',
+            date: today, confidence: 'High', impact: 'Medium',
+            title: `Lifecycle: ${lifecycle.map(s => s.name).join(' + ')}`,
+            description: `Lifecycle/CRM SDKs: ${lifecycle.map(s => s.name).join(', ')}.`,
+          });
+        }
+        break;
+      }
+
+      case 'ad_intelligence': {
+        const d = entry.data;
+        const ui = d.ua_interpretation || {};
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const parsePlatform = (p: any) => p ? ({
+          activeChannels: p.active_channels || [],
+          primaryChannels: p.primary_channels || [],
+          // rows may have { channel, impressions } or { channel, score } — normalise to score
+          impressionsByChannel: (p.impressions_by_channel || []).map((r: any) => ({
+            channel: r.channel,
+            score: r.score ?? r.impressions ?? 0,
+          })),
+          topGeos: p.top_geos || [],
+          totalImpressionsScore: p.total_impressions_score ?? p.total_impressions ?? 0,
+        }) : undefined;
+
+        // Support both flat format (old) and per-platform format (ios/android keys)
+        const hasPerPlatform = d.ios || d.android;
+        updates.adIntelligence = {
+          activeChannels: d.active_channels || d.ios?.active_channels || d.android?.active_channels || [],
+          primaryChannels: d.primary_channels || d.ios?.primary_channels || [],
+          creativeFormats: d.creative_formats || [],
+          spendTrend: d.spend_trend || '',
+          uaSophistication: ui.ua_sophistication || '',
+          asaPresent: ui.asa_present || false,
+          mmpGap: ui.mmp_gap || '',
+          paywallTension: ui.paywall_tension || '',
+          ios: hasPerPlatform ? parsePlatform(d.ios) : parsePlatform(d),
+          android: parsePlatform(d.android),
+        };
+
+        const allChannels = [...(d.ios?.active_channels || d.active_channels || []), ...(d.android?.active_channels || [])];
+        const uniqueChannels = [...new Set(allChannels)];
+        if (uniqueChannels.length) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Using Meta/TT', category: 'Ad Spend', source: 'Research',
+            date: today, confidence: 'High', impact: 'High',
+            title: `Active on ${uniqueChannels.length} UA channels: ${uniqueChannels.join(', ')}`,
+            description: ui.ua_sophistication || '',
+          });
+        }
+        break;
+      }
+
+      case 'crm_history': {
+        const d = entry.data;
+        if (d.deals?.length) {
+          for (const deal of d.deals as { name: string; stage: string; amount_usd?: number; created: string; closed?: string; note?: string }[]) {
+            signals.push({
+              id: genId(), accountId, accountName: companyName,
+              type: 'Content Download', category: 'Content', source: 'HubSpot',
+              date: deal.closed || deal.created, confidence: 'High', impact: 'High',
+              title: `Deal: ${deal.name} — ${deal.stage}`,
+              description: `${deal.amount_usd ? `$${deal.amount_usd.toLocaleString()} · ` : ''}Created ${deal.created}${deal.closed ? `, closed ${deal.closed}` : ''}${deal.note ? `. ${deal.note}` : ''}`,
+            });
+          }
+        }
+        break;
+      }
+
+      case 'hubspot_contacts': {
+        const contacts = (entry.data || []) as { name: string; email?: string; title?: string; status?: string }[];
+        if (contacts.length) {
+          const people: Person[] = contacts.map((c, i) => ({
+            id: genId('person'), accountId, name: c.name,
+            title: c.title || c.status || '', company: companyName,
+            department: guessDepartment(c.title || c.status || ''),
+            location: '', tenure: '', linkedin: '',
+            email: c.email,
+            source: 'hubspot' as const,
+            influence: guessInfluence(c.title || c.status || '') as 'High' | 'Medium' | 'Low',
+            avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+          }));
+          updates.people = [...(updates.people || []), ...people];
+        }
+        break;
+      }
+
+      case 'hubspot_deals': {
+        for (const deal of (entry.data || []) as { name?: string; deal_name?: string; dealname?: string; stage: string; amount?: number | null; closedate?: string; closed?: string; createdate?: string; created?: string; note?: string; notes?: string }[]) {
+          const name = deal.deal_name || deal.dealname || deal.name || 'Deal';
+          const date = deal.closedate || deal.closed || deal.createdate || deal.created || today;
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Content Download', category: 'Content', source: 'HubSpot',
+            date, confidence: 'High', impact: 'High',
+            title: `Deal: ${name} — ${deal.stage}`,
+            description: `${deal.amount ? `$${deal.amount.toLocaleString()} · ` : ''}${deal.note || deal.notes || ''}`,
+          });
+        }
+        break;
+      }
+
+      case 'email_collection': {
+        const d = entry.data;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const entryAny = entry as any;
+        updates.emailCollection = {
+          emailPattern: d.email_pattern || '',
+          confirmedCount: d.total_emails_confirmed || 0,
+          missingCount: d.total_emails_missing || 0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          contacts: Array.isArray(d.contacts) ? d.contacts.map((c: any) => ({
+            name: c.name || '',
+            email: c.email || null,
+            title: c.title || '',
+            hubspot_status: c.hubspot_status || '',
+            outreach_priority: c.outreach_priority || 0,
+          })) : [],
+        };
+        // Update existing people with confirmed emails
+        if (Array.isArray(d.contacts) && updates.people) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const ec of d.contacts as any[]) {
+            if (!ec.email) continue;
+            const match = updates.people.find((p: any) =>
+              (p.name || '').toLowerCase().includes((ec.name || '').split(' ')[0].toLowerCase())
+            );
+            if (match) match.email = ec.email;
+          }
+        }
+        // signal: email_collection confirmed (top level flag)
+        if (entryAny.email_collection === true || d.total_emails_confirmed > 0) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Using W2A', category: 'Ad Spend', source: 'Research',
+            date: today, confidence: 'High', impact: 'Medium',
+            title: `${d.total_emails_confirmed || 0} confirmed contact email${(d.total_emails_confirmed || 0) !== 1 ? 's' : ''}`,
+            description: d.email_pattern || '',
+          });
+        }
+        break;
+      }
+
+      case 'jobs':
+      case 'job_openings': {
+        const d = entry.data;
+        // data can be array directly or object with relevant_roles/jobs array
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const jobs: any[] = Array.isArray(d) ? d
+          : Array.isArray(d.relevant_roles) ? d.relevant_roles
+          : Array.isArray(d.jobs) ? d.jobs
+          : Array.isArray(d.openings) ? d.openings
+          : [];
+        const totalRoles = d.total_open_roles || jobs.length;
+        jobPostingCount += totalRoles;
+        if (totalRoles > 0 || jobs.length > 0) {
+          updates.jobOpenings = jobs.map((j: any) => ({
+            title: j.title || j.job_title || j.role || '',
+            department: j.department || j.function || j.team || '',
+            location: j.location || '',
+            url: j.url || j.job_url || '',
+            posted: j.posted || j.date || j.posted_at || '',
+            salary: j.salary || '',
+            relevance: j.adapty_relevance || j.relevance || '',
+            signal: j.signal || '',
+          }));
+          const depts = [...new Set(jobs.map((j: any) => j.department || j.function || j.team).filter(Boolean))] as string[];
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Hiring In Relevant Department', category: 'Hiring', source: 'Research',
+            date: today, confidence: 'High', impact: 'High',
+            title: `${totalRoles} open role${totalRoles !== 1 ? 's' : ''}${depts.length ? ` · ${depts.slice(0, 3).join(', ')}` : ''}`,
+            description: d.summary || d.hiring_interpretation || jobs.slice(0, 3).map((j: any) => j.title).filter(Boolean).join(', '),
+          });
+        }
+        break;
+      }
+
+      case 'hubspot_company_engagement': {
+        const d = entry.data;
+        const totals = d.company_totals || {};
+        hubspotOpens += totals.total_opens || totals.opens || 0;
+        hubspotClicks += totals.total_clicks || totals.clicks || 0;
+        hubspotDemos += totals.total_conversion_events || totals.contacts_with_demos || 0;
+        const contactsFound = totals.contacts_found || totals.total_contacts_found || 0;
+        if (contactsFound || totals.total_sessions) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Webinar Visited', category: 'Content', source: 'HubSpot',
+            date: totals.last_touch_date || today, confidence: 'High', impact: 'High',
+            title: `${contactsFound} contacts · ${totals.total_sessions || totals.meaningful_activity || 0} sessions · ${totals.total_conversion_events || totals.contacts_with_demos || 0} demos`,
+            description: `First touch: ${totals.first_touch_date || 'unknown'} · Last touch: ${totals.last_touch_date || 'unknown'}`,
+          });
+        }
+        const contacts = (d.contacts_summary || []) as { name: string; email?: string; title?: string; status?: string; conversion_count?: number; conversions?: number; visits?: number }[];
+        if (contacts.length) {
+          const people: Person[] = contacts.map((c, i) => {
+            const convCount = c.conversion_count ?? c.conversions ?? 0;
+            return {
+              id: genId('person'), accountId, name: c.name,
+              title: c.title || c.status || '', company: companyName,
+              department: guessDepartment(c.title || c.status || ''),
+              location: '', tenure: '', linkedin: '',
+              email: c.email,
+              source: 'hubspot' as const,
+              influence: (convCount > 5 ? 'High' : convCount > 0 || (c.visits ?? 0) > 3 ? 'Medium' : 'Low') as 'High' | 'Medium' | 'Low',
+              avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+            };
+          });
+          updates.people = [...(updates.people || []), ...people];
+        }
+        const timeline = (d.content_timeline || []) as { date: string; person: string; event: string; source?: string }[];
+        for (const item of timeline) {
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: 'Content Download', category: 'Content', source: 'HubSpot',
+            date: item.date, confidence: 'High', impact: 'Medium',
+            title: item.event,
+            description: `${item.person}${item.source ? ` · ${item.source}` : ''}`,
+          });
+        }
+        break;
+      }
+
+      case 'signals': {
+        for (const s of entry.data as { signal: string; type?: string; priority?: string; implication?: string; relevance?: string; detail?: string; why_now?: string }[]) {
+          if ((s.type || '').toLowerCase().includes('job')) jobPostingCount++;
+          const impact = s.priority === 'HIGH' ? 'High' : s.priority === 'MEDIUM' ? 'Medium' : 'Low';
+          const sigText = `${s.signal} ${s.detail || ''} ${s.implication || ''}`;
+          const hiring = isHiringSignal(sigText);
+          signals.push({
+            id: genId(), accountId, accountName: companyName,
+            type: hiring ? 'Hiring In Relevant Department' : 'Post mentioned specific keywords',
+            category: hiring ? 'Hiring' : 'Social',
+            source: 'Research',
+            date: today, confidence: 'High', impact: impact as 'High' | 'Medium' | 'Low',
+            title: s.signal,
+            description: s.detail || s.implication || s.relevance || s.why_now || '',
+          });
+        }
+        break;
+      }
+
+      case 'contacts': {
+        contactCount += Array.isArray(entry.data) ? entry.data.length : 0;
+        const people: Person[] = (entry.data as {
+          name: string;
+          title?: string;
+          linkedin?: string;
+          linkedin_url?: string;
+          email?: string;
+          location?: string;
+          photo_url?: string;
+          profile_pic_url?: string;
+          profile_image_url?: string;
+          profile_picture_url?: string;
+          overview?: { current_title?: string; email?: string; location?: string; bio?: string; photo_url?: string; profile_picture_url?: string };
+          career_track?: CareerEntry[];
+          what_to_pitch?: { likely_priorities?: string; recommended_angle?: string };
+          linkedin_posts?: {
+            posts?: Array<{ date: string; url?: string; content: string; likes?: number; comments?: number }> | null;
+          };
+        }[]).map((c, i) => {
+          const title = c.title || c.overview?.current_title || '';
+          const email = c.email || c.overview?.email || undefined;
+          const location = c.location || c.overview?.location || '';
+          const linkedin = c.linkedin || c.linkedin_url || '';
+          const bio = c.overview?.bio;
+          const photoUrl = c.profile_picture_url || c.photo_url || c.profile_pic_url || c.profile_image_url || c.overview?.profile_picture_url || c.overview?.photo_url || undefined;
+
+          // Map linkedin_posts.posts → recentPosts
+          const rawPosts = c.linkedin_posts?.posts;
+          const recentPosts = Array.isArray(rawPosts) ? rawPosts.map(p => ({
+            date: p.date,
+            platform: 'LinkedIn',
+            content: p.content,
+            url: p.url,
+          })) : undefined;
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const wtp = c.what_to_pitch as any;
+          const whatToPitch = wtp ? {
+            likelyPriorities: wtp.likely_priorities || wtp.likelyPriorities,
+            recommendedAngle: wtp.recommended_angle || wtp.recommendedAngle,
+            painPoints: wtp.pain_points || wtp.painPoints,
+          } : undefined;
+
+          return {
+            id: genId('person'), accountId,
+            name: c.name, title, company: companyName,
+            department: guessDepartment(title),
+            location, tenure: '', linkedin, email, bio, photoUrl,
+            source: 'amplemarket' as const,
+            influence: guessInfluence(title) as 'High' | 'Medium' | 'Low',
+            avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
+            careerTrack: c.career_track,
+            recentPosts,
+            whatToPitch,
+          };
+        });
+        updates.people = [...(updates.people || []), ...people];
+        break;
+      }
+
+      case 'news': {
+        updates.news = (entry.data as {
+          headline?: string;
+          title?: string;
+          date: string;
+          source?: string;
+          summary?: string;
+          url?: string;
+        }[]).map(item => ({
+          date: item.date,
+          title: item.headline || item.title || '',
+          source: item.source,
+          url: item.url,
+          summary: item.summary,
+        }));
+        break;
+      }
+
+      case 'paywall_analysis': {
+        const d = entry.data;
+        // Build key_observations from screen_inventory + executive_summary
+        const keyObs: string[] = [];
+        if (d.executive_summary) keyObs.push(d.executive_summary);
+        if (Array.isArray(d.screen_inventory)) keyObs.push(...d.screen_inventory.slice(0, 5));
+
+        // Opportunities from recommendations array
+        const opportunities: string[] = Array.isArray(d.recommendations)
+          ? d.recommendations.map((r: { priority?: string; recommendation?: string; rationale?: string }) =>
+              `[${r.priority || 'MED'}] ${r.recommendation || ''}${r.rationale ? ` — ${r.rationale.slice(0, 120)}` : ''}`
+            )
+          : [];
+
+        // Monetization stack from torpedo_strategy_connection or screen_inventory hints
+        const monetizationStack: string[] = [];
+        if (d.app_name) monetizationStack.push(d.app_name);
+        if (d.screen_type) monetizationStack.push(d.screen_type);
+
+        updates.paywallAnalysis = {
+          paywall_type: d.screen_type || d.paywall_type || '',
+          key_observations: keyObs,
+          monetization_stack: monetizationStack,
+          opportunities,
+        };
+        break;
+      }
+
+      case 'strategy': {
+        const d = entry.data;
+        // whyMatters from account_status + icp_fit + timing_quality
+        const whyParts = [];
+        if (d.icp_fit) whyParts.push(`ICP Fit: ${d.icp_fit}`);
+        if (d.timing_quality) whyParts.push(`Timing: ${d.timing_quality}`);
+        if (d.account_status) whyParts.push(d.account_status);
+        if (d.situation_summary) whyParts.push(d.situation_summary);
+        if (d.situation) whyParts.push(d.situation);
+        if (whyParts.length) updates.whyMatters = whyParts.join(' · ');
+
+        const angles = (d.angles || []) as { angle?: string; angle_name?: string; strength?: string; detail?: string; description?: string; rationale?: string; pitch_framing?: string; hook?: string; target_contacts?: string[]; recommended_contacts?: string[] }[];
+        if (angles.length) {
+          updates.whyKeywords = angles.map(a => ((a.angle_name || a.angle) || '').split(' ').slice(0, 4).join(' ')).filter(Boolean);
+        }
+
+        const top = angles[0];
+        const second = angles[1];
+        updates.opportunitySummary = {
+          businessTrigger: top ? (top.angle_name || top.angle || '') : (d.situation_summary || ''),
+          likelyPriorities: top ? (top.rationale || top.detail || top.description || top.hook || '') : '',
+          potentialPainPoints: second ? (second.rationale || second.detail || second.description || second.hook || '') : (d.caution || ''),
+          recommendedAngle: d.recommended_sequence || (top ? `${top.angle_name || top.angle || ''}: ${(top.hook || top.rationale || top.description || top.pitch_framing || '').slice(0, 300)}` : ''),
+        };
+        break;
+      }
+    }
+  }
+
+
+  // Save chart time-series
+  if (revByDate.size > 0) {
+    updates.revenueHistory = Array.from(revByDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
+  }
+  if (dlByDate.size > 0) {
+    updates.downloadHistory = Array.from(dlByDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v }));
+  }
+
+  // Sum MTR across all stores
+  const totalMTR = Object.values(mtrByStore).reduce((a, b) => a + b, 0);
+  if (totalMTR > 0) {
+    updates.lastMonthRevenue = `${fmt(totalMTR)}/mo`;
+  }
+
+  // Deduplicate people: amplemarket/contacts takes priority over hubspot
+  if (updates.people && updates.people.length > 0) {
+    // Sort so amplemarket comes before hubspot
+    const sorted = [...updates.people].sort((a, b) => {
+      if (a.source === 'amplemarket' && b.source !== 'amplemarket') return -1;
+      if (a.source !== 'amplemarket' && b.source === 'amplemarket') return 1;
+      return 0;
+    });
+    const seen = new Set<string>();
+    updates.people = sorted.filter(p => {
+      const key = (p.name || '').toLowerCase().trim();
+      if (!key) return false;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  // === Scoring system ===
+
+  // 1. Paywall (+7): paywall SDK detected or product with IAP
+  const paywallScore = hasPaywall ? 7 : 0;
+
+  // 2. Revenue Scale (0–25): based on last month combined revenue
+  let revenueScore = 0;
+  if (totalMTR >= 1_000_000) revenueScore = 25;
+  else if (totalMTR >= 200_000) revenueScore = 18;
+  else if (totalMTR >= 50_000) revenueScore = 10;
+  else if (totalMTR >= 10_000) revenueScore = 5;
+
+  // 3. Growth Momentum (0–25): best of revenue/download trend
+  const trendPct = Math.max(revTrendPct, dlTrendPct);
+  let growthScore = 0;
+  if (trendPct >= 30) growthScore = 25;
+  else if (trendPct >= 10) growthScore = 18;
+  else if (trendPct >= -10) growthScore = 10;
+  else if (trendPct >= -20) growthScore = 5;
+  // < -20% = 0
+
+  // 4. HubSpot Engagement (0–15): opens + clicks weighted, demos bonus
+  let hubspotScore = 0;
+  if (hubspotDemos > 0) hubspotScore = 15;
+  else if (hubspotClicks > 0) hubspotScore = 10;
+  else if (hubspotOpens > 0) hubspotScore = 5;
+
+  // 5. Job Postings (0–10)
+  let jobScore = 0;
+  if (jobPostingCount >= 6) jobScore = 10;
+  else if (jobPostingCount >= 3) jobScore = 8;
+  else if (jobPostingCount >= 1) jobScore = 5;
+
+  // 6. Contacts (0–10): 0 / 1-3 / 4-10 / 11+
+  let contactScore = 0;
+  if (contactCount >= 11) contactScore = 10;
+  else if (contactCount >= 4) contactScore = 7;
+  else if (contactCount >= 1) contactScore = 3;
+
+  // 7. Investment (0–15): from investmentHistory dates in the JSON
+  // High season (Sep–Nov, Jan–Mar) = 15, Low season (Apr–Jun, Jul–Aug, Dec) = 7
+  let investScore = 0;
+  if (investmentRounds.length > 0) {
+    // Use most recent round
+    const sorted = [...investmentRounds].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const latest = sorted[0];
+    const monthStr = (latest.date || '').slice(5, 7);
+    const month = parseInt(monthStr, 10);
+    if (!isNaN(month)) {
+      const highSeasonMonths = [1, 2, 3, 9, 10, 11];
+      investScore = highSeasonMonths.includes(month) ? 15 : 7;
+    } else {
+      investScore = 7;
+    }
+  }
+
+  const score = Math.min(100, paywallScore + revenueScore + growthScore + hubspotScore + jobScore + contactScore + investScore);
+  const scoreLabel = score >= 75 ? 'Hot' : score >= 50 ? 'Warm' : 'Cold';
+
+  return {
+    ...updates,
+    signals,
+    score,
+    scoreLabel: scoreLabel as Account['scoreLabel'],
+    enrichmentStatus: 'done',
+    lastUpdated: today,
+    torpedoData: entries,
+  };
+}
+
+function guessDepartment(title: string): string {
+  const t = (title || '').toLowerCase();
+  if (t.includes('ceo') || t.includes('coo') || t.includes('founder') || t.includes('president')) return 'Leadership';
+  if (t.includes('cto') || t.includes('engineer') || t.includes('tech')) return 'Engineering';
+  if (t.includes('product') || t.includes('pm')) return 'Product';
+  if (t.includes('growth') || t.includes('marketing') || t.includes('ua') || t.includes('acquisition') || t.includes('monetis')) return 'Marketing';
+  if (t.includes('design')) return 'Design';
+  if (t.includes('finance') || t.includes('cfo') || t.includes('revenue')) return 'Finance';
+  return 'Operations';
+}
+
+function guessInfluence(title: string): string {
+  const t = (title || '').toLowerCase();
+  if (t.includes('ceo') || t.includes('coo') || t.includes('cto') || t.includes('cpo') || t.includes('cdo') || t.includes('cfo') || t.includes('founder') || t.includes('head of') || t.includes('vp') || t.includes('director')) return 'High';
+  if (t.includes('lead') || t.includes('senior') || t.includes('manager')) return 'Medium';
+  return 'Low';
+}
